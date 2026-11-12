@@ -180,9 +180,11 @@ export function SettingsPage() {
               {pending.ok ? (
                 <>
                   <p>
-                    备份可读：已读 {Object.values(pending.data.progress).filter((item) => item.read).length} 章，
-                    背诵记录 {Object.keys(pending.data.recite).length} 章，践行笔记{' '}
-                    {Object.keys(pending.data.practice).length} 条。
+                    {`备份可读：已读 ${
+                      Object.values(pending.data.progress).filter((item) => item.read).length
+                    } 章，背诵记录 ${Object.keys(pending.data.recite).length} 章，践行笔记 ${
+                      Object.keys(pending.data.practice).length
+                    } 条。`}
                   </p>
                   <div className="row gap-sm">
                     <button type="button" className="button button-small button-primary" onClick={confirmImport}>
