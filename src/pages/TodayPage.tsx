@@ -14,8 +14,8 @@ export function TodayPage() {
   const data = useAppData()
   const now = useNow()
   const stats = getStats(data, now)
-  const chapter = dailyChapter()
-  const quote = dailyQuote()
+  const chapter = dailyChapter(new Date(now))
+  const quote = dailyQuote(new Date(now))
   const due = dueNumbers(data, now)
   const heatmap = recentActivity(data, 35, now)
 
