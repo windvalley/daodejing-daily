@@ -1900,7 +1900,7 @@ input[type='range'] {
 
 .note-row {
   display: grid;
-  grid-template-columns: 5.5em 1fr;
+  grid-template-columns: minmax(5.5em, 7.5em) 1fr;
   gap: 12px;
   padding: 9px 0;
   border-top: 1px solid var(--line);
@@ -3577,9 +3577,18 @@ input[type='range'] {
     font-size: 18px;
   }
 
+  /* 窄屏把词条与释义改为上下排列，避免释义被挤成细长一列 */
   .note-row {
-    grid-template-columns: 4.5em 1fr;
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .note-row dt {
+    font-size: 13.5px;
+  }
+
+  .note-row dd {
+    font-size: 13px;
   }
 }
 
