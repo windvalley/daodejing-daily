@@ -98,6 +98,16 @@ describe('背诵页', () => {
     expect(screen.getByText(/本次自评 95 分/)).toBeInTheDocument()
   })
 
+  it('默写模式给出正确的起始提示，不残留模板占位符', async () => {
+    const user = userEvent.setup()
+    renderApp('/memorize/8')
+    await user.click(screen.getByRole('button', { name: '默写' }))
+    const textarea = screen.getByLabelText('默写第8章')
+    const placeholder = textarea.getAttribute('placeholder') ?? ''
+    expect(placeholder).toContain('上善若水')
+    expect(placeholder).not.toContain('{')
+  })
+
   it('填空模式检查答案后给出分数', async () => {
     const user = userEvent.setup()
     renderApp('/memorize/8')

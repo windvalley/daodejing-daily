@@ -416,7 +416,7 @@ function WriteMode({ chapter }: { chapter: Chapter }) {
             className="textarea write-textarea"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="从「{chapter.text[0].slice(0, 8)}…」开始写。标点可以省略。"
+            placeholder={`从「${chapter.text[0].slice(0, 8)}…」开始写。标点可以省略。`}
             rows={9}
             spellCheck={false}
           />
