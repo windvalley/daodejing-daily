@@ -10,7 +10,7 @@ if (!container) throw new Error('找不到应用挂载节点')
 
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <ToastProvider>
         <App />
       </ToastProvider>
