@@ -49,7 +49,7 @@ export function Layout() {
       </a>
 
       <aside className="sidebar">
-        <NavLink to="/" className="brand" aria-label="道德经日课首页">
+        <NavLink to="/" className="brand">
           <span className="brand-seal" aria-hidden="true">
             道
           </span>
@@ -87,7 +87,7 @@ export function Layout() {
 
       <div className="app-main">
         <header className="mobile-topbar">
-          <NavLink to="/" className="brand brand-mobile" aria-label="道德经日课首页">
+          <NavLink to="/" className="brand brand-mobile">
             <span className="brand-seal" aria-hidden="true">
               道
             </span>
