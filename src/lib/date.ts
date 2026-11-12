@@ -6,6 +6,12 @@ export function startOfDay(input: Date | number = new Date()): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
 
+/** 所在月份第一天的零点时间戳 */
+export function monthStart(input: Date | number = new Date()): number {
+  const date = new Date(input)
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime()
+}
+
 /** 本地日期键，形如 2026-11-12 */
 export function dayKey(input: Date | number = new Date()): string {
   const date = new Date(input)

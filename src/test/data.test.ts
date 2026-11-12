@@ -10,8 +10,15 @@ import {
   sanitizeData,
   STORAGE_KEY,
 } from '../lib/store'
-import { dailyChapter, dailyChapterNumber, dueNumbers, recentActivity, streakDays } from '../lib/stats'
-import { dayKey } from '../lib/date'
+import {
+  dailyChapter,
+  dailyChapterNumber,
+  dueNumbers,
+  practiceCountSince,
+  recentActivity,
+  streakDays,
+} from '../lib/stats'
+import { dayKey, monthStart } from '../lib/date'
 import { searchChapters } from '../lib/search'
 
 beforeEach(() => {
@@ -57,7 +64,7 @@ describe('章节数据', () => {
         expect(getChapter(number)).toBeDefined()
       })
       concept.quotes.forEach((quote) => {
-        expect(plainText(getChapter(quote.chapter)!)).toContain(plainText({ ...getChapter(1)!, text: [quote.text] }))
+        expect(plainText(getChapter(quote.chapter)!)).toContain(quote.text.replace(/[，。；：！？、“”‘’]/g, ''))
       })
     })
   })
@@ -258,5 +265,19 @@ describe('学习轨迹对齐', () => {
   it('补位格不计入活动', () => {
     const cells = recentActivity(getSnapshot(), 35, new Date(2026, 10, 12).getTime())
     expect(cells.filter((cell) => cell.placeholder).every((cell) => cell.count === 0)).toBe(true)
+  })
+})
+
+describe('本月笔记统计', () => {
+  it('只统计本月写入的笔记', () => {
+    const now = new Date(2026, 10, 12, 10).getTime()
+    const early = new Date(2026, 10, 1, 9).getTime()
+    const lastMonth = new Date(2026, 9, 28, 9).getTime()
+    actions.savePractice(8, '本月笔记')
+    const data = getSnapshot()
+    data.practice[8].updatedAt = early
+    data.practice[11] = { text: '上月笔记', updatedAt: lastMonth }
+    expect(practiceCountSince(data, monthStart(now))).toBe(1)
+    expect(monthStart(now)).toBe(new Date(2026, 10, 1).getTime())
   })
 })

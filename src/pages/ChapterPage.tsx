@@ -331,8 +331,12 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
               <div className="review-status">
                 <span className="status-dot" />
                 <div>
-                  <strong>{review.dueAt <= now ? '现在可以复习' : '已在复习队列'}</strong>
-                  <p>下次时间：{formatDue(review.dueAt, now)}</p>
+                  <strong>{review.dueAt <= now ? '现在可以复习' : '下次复习'}</strong>
+                  <p>
+                    {review.dueAt <= now
+                      ? '已经到期，可以现在过一遍，评分后再安排下一次。'
+                      : `下次时间：${formatDue(review.dueAt, now)}`}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -354,7 +358,12 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
                   <Icon name="repeat" size={15} />
                   加入复习
                 </button>
-              ) : review.dueAt > now ? (
+              ) : review.dueAt <= now ? (
+                <Link className="button button-small" to="/review">
+                  <Icon name="repeat" size={15} />
+                  去复习
+                </Link>
+              ) : (
                 <button
                   type="button"
                   className="button button-small"
@@ -366,7 +375,7 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
                   <Icon name="repeat" size={15} />
                   提前复习
                 </button>
-              ) : null}
+              )}
             </div>
           </section>
 

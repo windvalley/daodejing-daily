@@ -68,6 +68,11 @@ export function nextDueAt(data: AppData, now = Date.now()): number | null {
   return upcoming.length ? Math.min(...upcoming) : null
 }
 
+/** 本月某一天起写入的笔记条数，用于实践页概览 */
+export function practiceCountSince(data: AppData, since: number): number {
+  return Object.values(data.practice).filter((entry) => entry.updatedAt >= since).length
+}
+
 export function todayActivity(data: AppData, date: Date = new Date()): DayActivity {
   return data.activity[dayKey(date)] ?? { read: 0, recite: 0, review: 0, practice: 0 }
 }

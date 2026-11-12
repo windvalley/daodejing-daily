@@ -2952,9 +2952,16 @@ input[type='range'] {
 }
 
 .note-card-prompt {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 200px;
+  overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.7;
+  font-size: 11.5px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
 }
 
 .prompt-groups {

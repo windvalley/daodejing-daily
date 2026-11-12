@@ -6,8 +6,9 @@ import { getChapter } from '../data/chapters'
 import { concepts } from '../data/concepts'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useAppData } from '../hooks/useAppData'
-import { formatRelative } from '../lib/date'
-import { practiceNumbers, recentActivity } from '../lib/stats'
+import { useNow } from '../hooks/useNow'
+import { formatRelative, monthStart } from '../lib/date'
+import { practiceCountSince, practiceNumbers, recentActivity } from '../lib/stats'
 import { actions } from '../lib/store'
 
 type Tab = 'notes' | 'prompts' | 'calendar'
@@ -21,10 +22,12 @@ const tabs: { value: Tab; label: string }[] = [
 export function PracticePage() {
   usePageTitle('实践')
   const data = useAppData()
+  const now = useNow()
   const [tab, setTab] = useState<Tab>('notes')
   const numbers = practiceNumbers(data)
   const total = numbers.length
-  const heatmap = recentActivity(data, 35)
+  const monthCount = practiceCountSince(data, monthStart(now))
+  const heatmap = recentActivity(data, 35, now)
   const prompts = useMemo(
     () => concepts.slice(0, 6).map((concept) => ({ concept, chapter: getChapter(concept.chapters[0]) })),
     [],
@@ -50,8 +53,8 @@ export function PracticePage() {
           <span>条践行笔记</span>
         </div>
         <div className="panel practice-summary-card">
-          <strong>{numbers.length ? numbers.length : 0}</strong>
-          <span>章有实践记录</span>
+          <strong>{monthCount}</strong>
+          <span>本月新增</span>
         </div>
         <div className="panel practice-summary-card">
           <strong>{heatmap.filter((cell) => cell.level > 0).length}</strong>
@@ -83,7 +86,9 @@ export function PracticePage() {
                   </div>
                   <p className="note-card-body">{entry.text}</p>
                   <div className="note-card-foot">
-                    <span className="note-card-prompt">实践提示：{chapter.practice}</span>
+                    <span className="note-card-prompt" title={chapter.practice}>
+                      第{number}章提示：{chapter.practice}
+                    </span>
                     <div className="row gap-sm">
                       <Link className="text-link" to={`/chapters/${number}?focus=practice`}>
                         编辑
