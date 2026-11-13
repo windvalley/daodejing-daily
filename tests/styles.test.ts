@@ -38,3 +38,24 @@ describe('移动端安全区', () => {
     expect(declarations).toEqual([])
   })
 })
+
+describe('布局收缩', () => {
+  it('所有网格列都用 minmax(0, ...)，避免内容把容器撑破', () => {
+    const declarations = [...css.matchAll(/grid-template-columns:\s*([^;]+);/g)].map((m) => m[1].trim())
+    expect(declarations.length).toBeGreaterThan(20)
+    const risky = declarations.filter((value) => {
+      // 纯固定宽度或以 1fr 作为最大值都安全；风险在于裸 1fr / auto 会取 max-content 最小值
+      return /(^|[\s(])1fr([\s)]|$)/.test(value) && !value.includes('minmax(0')
+    })
+    // 允许 repeat(3, 1fr) 这类写法单独存在前，先确认没有裸 1fr 列
+    expect(risky).toEqual([])
+  })
+
+  it('网格与弹性容器允许收缩', () => {
+    expect(ruleBody('\\.stack')).toMatch(/min-width:\s*0/)
+  })
+
+  it('body 兜底禁止横向滚动，固定底栏不会被挤出视口', () => {
+    expect(ruleBody('body')).toMatch(/overflow-x:\s*hidden/)
+  })
+})

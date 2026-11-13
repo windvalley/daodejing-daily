@@ -89,6 +89,8 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  /* 兜底：任何意外溢出都不让页面横向滚动，也不把固定底栏挤出屏幕 */
+  overflow-x: hidden;
   background-color: var(--bg);
   background-image:
     radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
@@ -234,7 +236,7 @@ svg {
   inset: auto 0 0 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 6px calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(6px + var(--safe-left));
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
@@ -493,6 +495,8 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* 作为网格项时必须允许收缩，否则会被内部 nowrap 文本撑宽 */
+  min-width: 0;
 }
 
 .section-heading {
@@ -982,6 +986,7 @@ input[type='range'] {
 
 .today-hero {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 24px 20px;
   border: 1px solid var(--line);
@@ -1144,6 +1149,7 @@ input[type='range'] {
 
 .today-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -1278,7 +1284,7 @@ input[type='range'] {
 
 .stat-strip {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
@@ -1554,7 +1560,7 @@ input[type='range'] {
 
 .chapter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(92px, minmax(0, 1fr)));
   gap: 8px;
 }
 
@@ -1792,6 +1798,7 @@ input[type='range'] {
 
 .reading-layout {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -1912,7 +1919,7 @@ input[type='range'] {
 
 .note-row {
   display: grid;
-  grid-template-columns: minmax(5.5em, 7.5em) 1fr;
+  grid-template-columns: minmax(5.5em, 7.5em) minmax(0, 1fr);
   gap: 12px;
   padding: 9px 0;
   border-top: 1px solid var(--line);
@@ -1946,7 +1953,7 @@ input[type='range'] {
 
 .chapter-pager {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   margin-top: 4px;
 }
@@ -2141,6 +2148,7 @@ input[type='range'] {
 
 .memorize-top {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -2263,7 +2271,7 @@ input[type='range'] {
 
 .chapter-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(64px, minmax(0, 1fr)));
   gap: 6px;
   margin-top: 12px;
 }
@@ -2459,7 +2467,7 @@ input[type='range'] {
 
 .grade-buttons {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -2753,6 +2761,7 @@ input[type='range'] {
 
 .review-layout {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -2837,7 +2846,7 @@ input[type='range'] {
 }
 
 .review-grade .grade-buttons {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .review-aside {
@@ -2865,6 +2874,7 @@ input[type='range'] {
 
 .review-stats-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -2895,7 +2905,7 @@ input[type='range'] {
 
 .practice-summary {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -2978,6 +2988,7 @@ input[type='range'] {
 
 .prompt-groups {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -3082,7 +3093,7 @@ input[type='range'] {
 
 .concept-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, minmax(0, 1fr)));
   gap: 10px;
 }
 
@@ -3177,6 +3188,7 @@ input[type='range'] {
 
 .quote-strip {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -3271,6 +3283,7 @@ input[type='range'] {
 
 .settings-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -3302,7 +3315,7 @@ input[type='range'] {
 
 .mini-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 14px;
   padding-top: 12px;
@@ -3352,7 +3365,7 @@ input[type='range'] {
 
 .about-list div {
   display: grid;
-  grid-template-columns: 4.5em 1fr;
+  grid-template-columns: 4.5em minmax(0, 1fr);
   gap: 10px;
   font-size: 12.5px;
   line-height: 1.7;
@@ -3395,7 +3408,7 @@ input[type='range'] {
   }
 
   .today-hero {
-    grid-template-columns: 1.45fr 1fr;
+    grid-template-columns: 1.45fr minmax(0, 1fr);
     padding: 28px 26px;
   }
 
@@ -3413,41 +3426,41 @@ input[type='range'] {
   }
 
   .chapter-grid {
-    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(108px, minmax(0, 1fr)));
     gap: 10px;
   }
 
   .memorize-top {
-    grid-template-columns: 1.35fr 1fr;
+    grid-template-columns: 1.35fr minmax(0, 1fr);
     align-items: stretch;
   }
 
   .quote-strip {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .review-stats-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .settings-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .practice-summary {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .grade-buttons {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .review-grade .grade-buttons {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .prompt-groups {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -3455,7 +3468,7 @@ input[type='range'] {
 
 @media (min-width: 900px) {
   .chapter-grid {
-    grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(116px, minmax(0, 1fr)));
   }
 
   .reading-layout {
@@ -3525,16 +3538,16 @@ input[type='range'] {
   }
 
   .settings-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
   }
 
   .concept-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .prompt-groups {
-    grid-template-columns: 1.2fr 1fr;
+    grid-template-columns: 1.2fr minmax(0, 1fr);
     align-items: start;
   }
 }
@@ -3545,7 +3558,7 @@ input[type='range'] {
   }
 
   .concept-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -3569,7 +3582,7 @@ input[type='range'] {
   }
 
   .chapter-pager {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pager-link.is-next {
@@ -3578,7 +3591,7 @@ input[type='range'] {
   }
 
   .mini-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .practice-summary-card {
@@ -3591,7 +3604,7 @@ input[type='range'] {
 
   /* 窄屏把词条与释义改为上下排列，避免释义被挤成细长一列 */
   .note-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2px;
   }
 
