@@ -15,6 +15,15 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
+  plugins: {
+    SystemBars: {
+      // 走 CSS 变量模式：由 Web 侧读取安全区自行避让，横竖屏都能精确对齐
+      insetsHandling: 'css',
+      // 页面本来就带 viewport-fit=cover，提前声明可避免首屏跳动
+      initialViewportFitValueHint: 'cover',
+      style: 'DEFAULT',
+    },
+  },
 }
 
 export default config

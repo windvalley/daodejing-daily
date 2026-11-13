@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 窗口底色与网页浅色主题背景一致，半透明顶栏与底栏叠上去才不会发灰 -->
+    <color name="windowBackground">#F5F2EA</color>
+</resources>

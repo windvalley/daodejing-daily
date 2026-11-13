@@ -34,6 +34,16 @@
   --font-serif: 'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'STSong', 'SimSun', Georgia, serif;
   --sidebar-w: 236px;
   --max-w: 1120px;
+
+  /*
+   * 安全区：取 env() 与 Capacitor 注入的 --safe-area-inset-* 中较大者。
+   * 安卓 WebView 在边到边模式下 env() 可能为 0，原生层会补上自定义变量；
+   * 浏览器里则回落到 env()，iOS 刘海与底部横条同样生效。
+   */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
 }
 
 :root[data-theme='dark'] {
@@ -194,7 +204,8 @@ svg {
   width: 100%;
   max-width: var(--max-w);
   margin: 0 auto;
-  padding: 18px 16px 96px;
+  /* 底部多留一截，避免最后一行被固定导航压住 */
+  padding: 18px calc(16px + var(--safe-right)) calc(96px + var(--safe-bottom)) calc(16px + var(--safe-left));
 }
 
 .mobile-topbar {
@@ -205,7 +216,8 @@ svg {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 16px;
+  /* 顶部让出状态栏，左右让出刘海或圆角缺口 */
+  padding: calc(10px + var(--safe-top)) calc(16px + var(--safe-right)) 10px calc(16px + var(--safe-left));
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(14px);
@@ -223,7 +235,7 @@ svg {
   z-index: 40;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  padding: 6px calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(6px + var(--safe-left));
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(16px);
@@ -721,7 +733,7 @@ svg {
 .toast-stack {
   position: fixed;
   left: 50%;
-  bottom: calc(78px + env(safe-area-inset-bottom));
+  bottom: calc(78px + var(--safe-bottom));
   z-index: 90;
   display: flex;
   flex-direction: column;
@@ -3375,7 +3387,7 @@ input[type='range'] {
 
 @media (min-width: 640px) {
   .content {
-    padding: 22px 24px 100px;
+    padding: 22px calc(24px + var(--safe-right)) calc(100px + var(--safe-bottom)) calc(24px + var(--safe-left));
   }
 
   .page-title {
@@ -3493,7 +3505,7 @@ input[type='range'] {
   }
 
   .content {
-    padding: 30px 40px 64px;
+    padding: 30px calc(40px + var(--safe-right)) calc(64px + var(--safe-bottom)) calc(40px + var(--safe-left));
   }
 
   .toast-stack {
