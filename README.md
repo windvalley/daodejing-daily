@@ -84,6 +84,42 @@ BASE_PATH=/daodejing/ pnpm build
 `base`、manifest 的 `start_url`、Service Worker 作用域与路由 basename 会一起跟随 `BASE_PATH`。
 本站使用 BrowserRouter，托管方需要把未知路径回退到 `index.html`。
 
+## 在手机上使用
+
+分两种用法，能力差别很大。
+
+### 一、同一 Wi-Fi 临时试用
+
+电脑上运行：
+
+```bash
+pnpm build
+pnpm preview:lan
+```
+
+终端会打印 `Network: http://<电脑局域网地址>:4173/`，手机连同一个 Wi-Fi，在浏览器里打开这个地址即可。
+
+注意：
+
+- 电脑必须保持开机、服务保持运行，电脑休眠后手机就打不开了。
+- 换 Wi-Fi 或电脑换了 IP，地址会变。
+- 这是 HTTP 访问，浏览器不把它当作安全上下文，因此 **Service Worker 不会注册，离线不可用，也不能真正安装成 PWA**。阅读、背诵、写笔记与本地保存都正常。
+- 想查电脑的局域网地址，macOS 用 `ipconfig getifaddr en0`，Windows 用 `ipconfig`。
+
+### 二、部署后安装成 PWA（推荐日常使用）
+
+把 `dist/` 部署到任意 HTTPS 静态托管（Netlify、Vercel、Cloudflare Pages、GitHub Pages 等），手机访问该 HTTPS 地址后：
+
+- **iOS Safari**：分享按钮 → 添加到主屏幕。
+- **Android Chrome**：右上角菜单 → 安装应用 / 添加到主屏幕。
+
+安装后可全屏运行、断网可用。只有 HTTPS（或 localhost）才会被浏览器视为安全上下文，PWA 与离线缓存依赖这一点。
+
+### 两个容易踩的坑
+
+- **数据不跨设备**。手机和电脑各自存各自的 localStorage，互不同步。换设备前在「我的」页面导出备份，再到新设备导入。
+- **换域名等于换数据**。localhost、局域网 IP、正式域名在浏览器眼里是三个不同的站点，数据不共享。
+
 ## 数据与隐私
 
 所有学习数据只写入当前浏览器的 localStorage，键名为 `daodejing.data.v1`，不会上传服务器。
