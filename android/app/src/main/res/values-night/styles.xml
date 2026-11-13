@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 深色模式下状态栏跟随应用暗色背景，图标转为浅色 -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#8FBFA7</item>
+        <item name="colorPrimaryDark">#14150F</item>
+        <item name="colorAccent">#C9A969</item>
+        <item name="android:statusBarColor">#14150F</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+</resources>

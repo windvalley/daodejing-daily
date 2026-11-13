@@ -64,6 +64,9 @@ src/
   pages/             今日、全篇、章节、背诵、复习、实践、概念、设置
   styles/            全局样式与响应式规则
   test/              数据层与页面测试
+android/             Capacitor 生成的安卓工程与图标、启动图
+scripts/build-apk.sh 一键构建 APK
+docs/mobile.md      手机安装与更新说明
 ```
 
 ## 内容说明
@@ -86,9 +89,23 @@ BASE_PATH=/daodejing/ pnpm build
 
 ## 在手机上使用
 
-分两种用法，能力差别很大。
+三种用法，能力差别很大。
 
-### 一、同一 Wi-Fi 临时试用
+### 一、安卓 APK（推荐）
+
+`release/道德经日课-1.0.apk` 可以直接传到安卓手机上安装，不需要应用商店。
+安装后是独立应用：图标进桌面、全屏运行、断网可用，数据存在应用沙盒里，不会被浏览器按天清理。
+
+重新打包：
+
+```bash
+pnpm apk
+```
+
+需要 JDK 21 与 Android SDK（platform 36、build-tools 36）。签名配置在 `android/keystore/`，该目录不入库，请自行备份。
+安装与更新细节见 [docs/mobile.md](docs/mobile.md)。
+
+### 二、同一 Wi-Fi 临时试用
 
 电脑上运行：
 
@@ -106,7 +123,7 @@ pnpm preview:lan
 - 这是 HTTP 访问，浏览器不把它当作安全上下文，因此 **Service Worker 不会注册，离线不可用，也不能真正安装成 PWA**。阅读、背诵、写笔记与本地保存都正常。
 - 想查电脑的局域网地址，macOS 用 `ipconfig getifaddr en0`，Windows 用 `ipconfig`。
 
-### 二、部署后安装成 PWA（推荐日常使用）
+### 三、部署后安装成 PWA（iOS 用这个）
 
 把 `dist/` 部署到任意 HTTPS 静态托管（Netlify、Vercel、Cloudflare Pages、GitHub Pages 等），手机访问该 HTTPS 地址后：
 
