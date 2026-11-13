@@ -28,24 +28,51 @@ iOS 无法像安卓那样直接装自签名安装包，需要 Apple 开发者账
 
 ## 四、真机模拟器测试
 
-本机已配好可直接跑的安卓模拟器，用来验证边到边布局、主题切换与完整学习流程。
+本机已配好两个可直接跑的安卓模拟器，用来验证边到边布局、主题切换、完整学习流程与朗读。
+
+- `ddj-phone` 用 `default` 镜像，启动快，适合看布局和流程，但没有语音引擎。
+- `ddj-phone-tts` 用 `google_apis` 镜像，自带 Google 语音引擎，验证朗读必须用它。
 
 环境：
 
 - JDK 21 在 `~/.local/jdk/jdk-21.0.13+9/Contents/Home`
-- Android SDK 在 `~/.local/android-sdk`（platform 36、build-tools 36、emulator、系统镜像 `android-36;default;arm64-v8a`）
-- AVD 名为 `ddj-phone`，规格 Pixel 7，分辨率 1080x2400，密度 420
+- Android SDK 在 `~/.local/android-sdk`（platform 36、build-tools 36、emulator、系统镜像 `android-36;default;arm64-v8a` 与 `android-36;google_apis;arm64-v8a`）
+- 两个 AVD 都是 Pixel 7 规格，分辨率 1080x2400，密度 420
 
-启动与安装：
+`default` 镜像没有语音引擎，点「朗读」只会得到 `Not yet initialized or not available on this device.`，随后按钮恢复原状，应用不会崩溃。
+这是镜像缺少能力，不是应用问题，换 `ddj-phone-tts` 就能正常朗读。
+
+启动与安装（`-avd` 后面换成要用的 AVD 名）：
 
 ```bash
 export ANDROID_HOME=$HOME/.local/android-sdk
 export PATH="$HOME/.local/jdk/jdk-21.0.13+9/Contents/Home/bin:$ANDROID_HOME/platform-tools:$PATH"
 
-$ANDROID_HOME/emulator/emulator -avd ddj-phone -no-snapshot -no-boot-anim -gpu swiftshader_indirect -no-audio &
+$ANDROID_HOME/emulator/emulator -avd ddj-phone-tts -no-snapshot -no-boot-anim -gpu swiftshader_indirect -no-audio &
 adb wait-for-device
 adb install -r android/app/build/outputs/apk/release/app-release.apk
 adb shell am start -n com.daodejing.daily/.MainActivity
+```
+
+### 验证朗读
+
+1. 进入任意章节，点「朗读」，按钮应变成「停止」，读完自动变回「朗读」。
+2. 朗读期间再点一次「停止」，应立刻停下并恢复按钮。
+3. 看日志确认请求确实交给了系统语音引擎：
+
+```bash
+adb logcat -s GoogleTTSServiceImpl:I
+```
+
+出现 `Synthesis request for locale zho-CHN` 与 `TTS dispatch: cmn-cn-...` 即说明引擎已接单。
+启动命令带 `-no-audio` 时宿主机听不到声音，但合成链路照常执行；想听声音去掉 `-no-audio`。
+首次朗读中文时引擎会联网拉取语音包，日志里是 `Requesting download of URL https://dl.google.com/android/tts/...`，保持联网稍等即可。
+
+换机器需要重建 AVD 时：
+
+```bash
+sdkmanager "system-images;android-36;google_apis;arm64-v8a"
+avdmanager create avd -n ddj-phone-tts -k "system-images;android-36;google_apis;arm64-v8a" -d pixel_7
 ```
 
 WebView 调试：
@@ -59,7 +86,6 @@ adb forward tcp:9333 localabstract:webview_devtools_remote_$PID
 
 已知限制：
 
-- `default` 镜像不含语音引擎，点「朗读」会得到 `Not yet initialized or not available on this device.`，应用做了兜底不会崩溃。要测朗读需换带 TTS 的镜像或真机。
 - 模拟器启动后约 20 秒完成开机，截屏前建议等待数秒，否则可能拍到未渲染完成的空白页。
 
 ## 五、数据在哪
