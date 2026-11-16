@@ -161,13 +161,16 @@ describe('store', () => {
     expect(getSnapshot().practice[8]).toBeUndefined()
   })
 
-  it('朗读音色默认男声且可切换', () => {
-    expect(getSnapshot().settings.speechVoice).toBe('male')
-    actions.updateSettings({ speechVoice: 'female' })
-    expect(getSnapshot().settings.speechVoice).toBe('female')
+  it('朗读音色默认跟随系统，可保存音色 URI', () => {
+    expect(getSnapshot().settings.speechVoiceURI).toBeNull()
+    actions.updateSettings({ speechVoiceURI: 'cmn-cn-x-cce-local' })
+    expect(getSnapshot().settings.speechVoiceURI).toBe('cmn-cn-x-cce-local')
+    // 清空即回到跟随系统
+    actions.updateSettings({ speechVoiceURI: null })
+    expect(getSnapshot().settings.speechVoiceURI).toBeNull()
     // 非法值退回默认
-    actions.updateSettings({ speechVoice: 'robot' as never })
-    expect(getSnapshot().settings.speechVoice).toBe('male')
+    actions.updateSettings({ speechVoiceURI: 42 as never })
+    expect(getSnapshot().settings.speechVoiceURI).toBeNull()
   })
 
   it('设置写入后会被规范化', () => {
