@@ -53,9 +53,10 @@ describe('全篇页', () => {
 describe('章页', () => {
   it('显示原文、译文与注释，并能标记已读', async () => {
     const user = userEvent.setup()
-    renderApp('/chapters/8')
+    const { container } = renderApp('/chapters/8')
     expect(screen.getByRole('heading', { level: 1, name: '易性' })).toBeInTheDocument()
-    expect(screen.getByText(/上善若水。/)).toBeInTheDocument()
+    // 注音把原文拆成了逐字节点，按整段文本比对
+    expect(container.querySelector('.original-text')?.textContent).toContain('上善若水。')
     expect(screen.getByText(/最高的善就像水/)).toBeInTheDocument()
     expect(screen.getByText('几于道')).toBeInTheDocument()
 

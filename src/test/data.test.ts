@@ -75,9 +75,9 @@ describe('注音与逐字解析', () => {
   const HAN = /^\p{Script=Han}$/u
   const PINYIN = /^[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü]+$/
 
-  it('已录入的注音与原文逐句逐字对齐', () => {
+  it('八十一章都录入了注音，且与原文逐句逐字对齐', () => {
     const glossed = chapters.filter((chapter) => getChapterGloss(chapter.number))
-    expect(glossed.length).toBeGreaterThan(0)
+    expect(glossed).toHaveLength(81)
     glossed.forEach((chapter) => {
       const gloss = getChapterGloss(chapter.number)!
       expect(glossMatchesChapter(gloss, chapter)).toBe(true)
@@ -87,14 +87,14 @@ describe('注音与逐字解析', () => {
 
   it('汉字都有带声调拼音与释义，标点不注', () => {
     chapters.forEach((chapter) => {
-      const gloss = getChapterGloss(chapter.number)
-      if (!gloss) return
+      const gloss = getChapterGloss(chapter.number)!
       gloss.forEach((line) => {
         line.forEach((token) => {
           expect(Array.from(token.char)).toHaveLength(1)
           if (HAN.test(token.char)) {
             expect(token.pinyin).toMatch(PINYIN)
-            expect(token.gloss?.length ?? 0).toBeGreaterThan(3)
+            // 释义统一写成「词性。释义。」，便于逐字阅读
+            expect(token.gloss).toMatch(/^[\u4e00-\u9fff]{2,8}。[\s\S]{2,}$/)
             // 通假、旧读之类的提示要短，写成长句说明应并入释义
             expect(token.hint?.length ?? 0).toBeLessThanOrEqual(8)
           } else {

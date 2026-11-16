@@ -1,11 +1,21 @@
 import type { Chapter } from '../chapters/types'
 import { glosses1to20 } from './part1'
+import { glosses21to40 } from './part2'
+import { glosses41to60 } from './part3'
+import { glosses61to81 } from './part4'
 import type { ChapterGloss } from './types'
 
 export type { ChapterGloss, CharGloss, GlossLine } from './types'
 
+const allGlosses: Record<number, ChapterGloss> = {
+  ...glosses1to20,
+  ...glosses21to40,
+  ...glosses41to60,
+  ...glosses61to81,
+}
+
 const glossMap = new Map<number, ChapterGloss>(
-  Object.entries(glosses1to20).map(([number, gloss]) => [Number(number), gloss]),
+  Object.entries(allGlosses).map(([number, gloss]) => [Number(number), gloss]),
 )
 
 /** 取一章的逐字注音与解析，没有录入时返回 undefined */
