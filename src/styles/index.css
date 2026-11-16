@@ -3446,6 +3446,19 @@ input[type='range'] {
   line-height: 1.8;
 }
 
+/* 音色试听：按钮与说明并排，窄屏时说明换行仍与按钮左对齐 */
+.voice-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.voice-preview .muted-text {
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
 .setting-copy {
   color: var(--muted);
   font-size: 12.5px;

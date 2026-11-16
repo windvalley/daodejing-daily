@@ -7,7 +7,8 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { useAppData } from '../hooks/useAppData'
 import { formatDateTime } from '../lib/date'
 import { getStats } from '../lib/stats'
-import { actions, exportData, parseImport, type ThemeMode } from '../lib/store'
+import { useSpeech } from '../hooks/useSpeech'
+import { actions, exportData, parseImport, type SpeechVoice, type ThemeMode } from '../lib/store'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
@@ -15,12 +16,21 @@ const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: '深色' },
 ]
 
+const voiceOptions: { value: SpeechVoice; label: string }[] = [
+  { value: 'male', label: '男声' },
+  { value: 'female', label: '女声' },
+]
+
+/** 试听用的短句，含多音字，顺便能听出读音校正是否生效 */
+const VOICE_SAMPLE = '道可道，非常道。上善若水，水善利万物而不争。'
+
 export function SettingsPage() {
   usePageTitle('我的')
   const data = useAppData()
   const toast = useToast()
   const stats = getStats(data)
   const fileRef = useRef<HTMLInputElement>(null)
+  const speech = useSpeech()
   const [pending, setPending] = useState<ReturnType<typeof parseImport> | null>(null)
 
   const download = () => {
@@ -139,6 +149,40 @@ export function SettingsPage() {
               value={data.settings.speechRate}
               onChange={(event) => actions.updateSettings({ speechRate: Number(event.target.value) })}
             />
+          </div>
+          <div className="setting-block">
+            <label className="field-label" htmlFor="voice">
+              朗读音色
+            </label>
+            <Segmented
+              options={voiceOptions}
+              value={data.settings.speechVoice}
+              onChange={(speechVoice) => actions.updateSettings({ speechVoice })}
+              ariaLabel="选择朗读音色"
+            />
+            <div className="voice-preview">
+              <button
+                type="button"
+                className="button button-small"
+                onClick={() => {
+                  if (speech.speaking) {
+                    speech.stop()
+                    return
+                  }
+                  speech.speak(VOICE_SAMPLE, data.settings.speechRate, data.settings.speechVoice)
+                }}
+                disabled={!speech.supported}
+                title={speech.supported ? '试听当前音色' : '当前浏览器不支持朗读'}
+              >
+                <Icon name={speech.speaking ? 'stop' : 'volume'} size={15} />
+                {speech.speaking ? '停止' : '试听'}
+              </button>
+              <span className="muted-text">
+                {speech.supported
+                  ? '系统音色不分男女，这里按实测音高分成低音与高音。'
+                  : '当前环境不支持朗读，音色设置不会生效。'}
+              </span>
+            </div>
           </div>
           <div className="mini-stats">
             <div>

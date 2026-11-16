@@ -161,6 +161,15 @@ describe('store', () => {
     expect(getSnapshot().practice[8]).toBeUndefined()
   })
 
+  it('朗读音色默认男声且可切换', () => {
+    expect(getSnapshot().settings.speechVoice).toBe('male')
+    actions.updateSettings({ speechVoice: 'female' })
+    expect(getSnapshot().settings.speechVoice).toBe('female')
+    // 非法值退回默认
+    actions.updateSettings({ speechVoice: 'robot' as never })
+    expect(getSnapshot().settings.speechVoice).toBe('male')
+  })
+
   it('设置写入后会被规范化', () => {
     actions.updateSettings({ fontSize: 100, dailyReviewGoal: -3, theme: 'dark' })
     const settings = getSnapshot().settings
