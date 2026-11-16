@@ -711,7 +711,7 @@ export const glosses21to40: Record<number, ChapterGloss> = {
       { char: '大', pinyin: 'dà', gloss: '副词。很、极。' },
       { char: '迷', pinyin: 'mí', gloss: '动词。迷惑、昏昧。' },
       { char: '，' },
-      { char: '是', pinyin: 'shì', gloss: '代词。这，指下文所说。' },
+      { char: '是', pinyin: 'shì', gloss: '代词。这，指上文所说。' },
       { char: '谓', pinyin: 'wèi', gloss: '动词。称作、叫做。' },
       { char: '要', pinyin: 'yào', gloss: '形容词。精要、切要。' },
       { char: '妙', pinyin: 'miào', gloss: '形容词。微妙、精深。' },
