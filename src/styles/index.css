@@ -1570,7 +1570,8 @@ input[type='range'] {
 
 .chapter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  /* 104px 是 360px 宽手机放下三列的下限，更宽的手机自然升到四列 */
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 8px;
 }
 
@@ -1685,6 +1686,45 @@ input[type='range'] {
 .chapter-card-status.is-due {
   color: var(--danger);
   font-weight: 500;
+}
+
+/*
+ * 手机上目录是「选章索引」：三列或更多列时卡片只有百余像素宽，
+ * 摘要会挤成窄条，分卷脚注又与分组标题重复，二者只在平板以上显示。
+ */
+@media (max-width: 639px) {
+  .chapter-card.is-compact {
+    gap: 4px;
+    min-height: 0;
+    padding: 9px 10px;
+  }
+
+  .chapter-card.is-compact .chapter-card-excerpt,
+  .chapter-card.is-compact .chapter-card-status.is-muted {
+    display: none;
+  }
+
+  .chapter-card.is-compact .chapter-card-label {
+    display: none;
+  }
+
+  .chapter-card.is-compact .chapter-card-index {
+    line-height: 1.2;
+  }
+
+  .chapter-card.is-compact .chapter-card-badges {
+    gap: 2px;
+  }
+
+  .chapter-card.is-compact .badge {
+    width: 17px;
+    height: 17px;
+  }
+
+  .chapter-card.is-compact .chapter-card-title {
+    font-size: 14px;
+    line-height: 1.4;
+  }
 }
 
 .concepts-banner {
@@ -3576,7 +3616,7 @@ input[type='range'] {
   }
 
   .chapter-grid {
-    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
   }
 
