@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { useToast } from '../components/toast-context'
@@ -7,6 +7,8 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { useAppData } from '../hooks/useAppData'
 import { formatDateTime } from '../lib/date'
 import { getStats } from '../lib/stats'
+import { useSpeech } from '../hooks/useSpeech'
+import { defaultVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
 import { actions, exportData, parseImport, type ThemeMode } from '../lib/store'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
@@ -15,12 +17,29 @@ const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: '深色' },
 ]
 
+/** 试听用的短句，含多音字，顺便能听出读音校正是否生效 */
+const VOICE_SAMPLE = '道可道，非常道。上善若水，水善利万物而不争。'
+
 export function SettingsPage() {
   usePageTitle('我的')
   const data = useAppData()
   const toast = useToast()
   const stats = getStats(data)
   const fileRef = useRef<HTMLInputElement>(null)
+  const speech = useSpeech()
+  const [voices, setVoices] = useState<VoiceOption[]>([])
+  const [showAllVoices, setShowAllVoices] = useState(false)
+
+  // 音色列表要等原生插件就绪，进页面后异步读一次
+  useEffect(() => {
+    let alive = true
+    void loadVoiceOptions().then((list) => {
+      if (alive) setVoices(list)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
   const [pending, setPending] = useState<ReturnType<typeof parseImport> | null>(null)
 
   const download = () => {
@@ -139,6 +158,61 @@ export function SettingsPage() {
               value={data.settings.speechRate}
               onChange={(event) => actions.updateSettings({ speechRate: Number(event.target.value) })}
             />
+          </div>
+          <div className="setting-block">
+            <label className="field-label" htmlFor="voice">
+              朗读音色
+              <span className="field-value">{voices.length ? `${voices.length} 个可用` : ''}</span>
+            </label>
+            <select
+              id="voice"
+              className="select"
+              value={data.settings.speechVoiceURI ?? ''}
+              onChange={(event) => actions.updateSettings({ speechVoiceURI: event.target.value || null })}
+              disabled={!voices.length}
+            >
+              <option value="">跟随系统默认</option>
+              {(showAllVoices ? voices : defaultVoiceOptions(voices)).map((voice) => (
+                <option key={voice.uri} value={voice.uri}>
+                  {voice.label}
+                </option>
+              ))}
+            </select>
+            <div className="voice-preview">
+              <button
+                type="button"
+                className="button button-small"
+                onClick={() => {
+                  if (speech.speaking) {
+                    speech.stop()
+                    return
+                  }
+                  speech.speak(VOICE_SAMPLE, data.settings.speechRate, data.settings.speechVoiceURI)
+                }}
+                disabled={!speech.supported}
+                title={speech.supported ? '试听当前音色' : '当前浏览器不支持朗读'}
+              >
+                <Icon name={speech.speaking ? 'stop' : 'volume'} size={15} />
+                {speech.speaking ? '停止' : '试听'}
+              </button>
+              <span className="muted-text">
+                {!speech.supported
+                  ? '当前环境不支持朗读，音色设置不会生效。'
+                  : voices.length
+                    ? '音色由系统提供，换设备后可能需要重选。'
+                    : '正在读取系统音色…'}
+              </span>
+            </div>
+            {voices.length > 0 ? (
+              <label className="voice-all">
+                <input
+                  type="checkbox"
+                  checked={showAllVoices}
+                  onChange={(event) => setShowAllVoices(event.target.checked)}
+                />
+                <span>显示全部语言（{voices.length} 个）</span>
+              </label>
+            ) : null}
           </div>
           <div className="mini-stats">
             <div>

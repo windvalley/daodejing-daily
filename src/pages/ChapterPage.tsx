@@ -10,6 +10,8 @@ import { useNow } from '../hooks/useNow'
 import { useAppData } from '../hooks/useAppData'
 import { useSpeech } from '../hooks/useSpeech'
 import { formatDateTime, formatDue, formatRelative } from '../lib/date'
+import { chapterSpeechText } from '../lib/speech'
+import { applyToneSandhi } from '../lib/toneSandhi'
 import { actions } from '../lib/store'
 
 function InvalidChapter({ number }: { number: string }) {
@@ -51,8 +53,12 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
   const previous = getChapter(chapter.number - 1)
   const next = getChapter(chapter.number + 1)
   const relatedConcepts = conceptsForChapter(chapter.number)
-  const storedGloss = getChapterGloss(chapter.number)
-  const gloss = storedGloss && glossMatchesChapter(storedGloss, chapter) ? storedGloss : null
+  // 数据存本调，展示与朗读前按上下文推导「不」「一」的变调
+  const gloss = useMemo(() => {
+    const stored = getChapterGloss(chapter.number)
+    if (!stored || !glossMatchesChapter(stored, chapter)) return null
+    return applyToneSandhi(stored)
+  }, [chapter])
 
   useEffect(() => {
     if (searchParams.get('focus') !== 'practice') return undefined
@@ -63,7 +69,8 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
     return () => window.clearTimeout(timer)
   }, [searchParams, chapter.number])
 
-  const speechText = useMemo(() => `第${chapter.number}章，${chapter.title}。${chapter.text.join('')}`, [chapter])
+  // 朗读文本走注音校正：多音字换成同音字再交给 TTS，避免引擎读错
+  const speechText = useMemo(() => chapterSpeechText(chapter), [chapter])
 
   const savePractice = () => {
     actions.savePractice(chapter.number, note)
@@ -94,7 +101,7 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
       speech.stop()
       return
     }
-    speech.speak(speechText, data.settings.speechRate)
+    speech.speak(speechText, data.settings.speechRate, data.settings.speechVoiceURI)
   }
 
   return (

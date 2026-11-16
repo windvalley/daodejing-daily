@@ -951,6 +951,30 @@ svg {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* 下拉与文本框保持同一套边框与聚焦样式 */
+.select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.select:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 input[type='range'] {
   width: 100%;
   height: 26px;
@@ -3494,6 +3518,35 @@ input[type='range'] {
   font-family: var(--font-serif);
   font-size: var(--reading-size);
   line-height: 1.8;
+}
+
+/* 音色试听：按钮与说明并排，窄屏时说明换行仍与按钮左对齐 */
+.voice-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.voice-preview .muted-text {
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.voice-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.voice-all input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
 }
 
 .setting-copy {

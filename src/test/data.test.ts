@@ -161,6 +161,18 @@ describe('store', () => {
     expect(getSnapshot().practice[8]).toBeUndefined()
   })
 
+  it('朗读音色默认跟随系统，可保存音色 URI', () => {
+    expect(getSnapshot().settings.speechVoiceURI).toBeNull()
+    actions.updateSettings({ speechVoiceURI: 'cmn-cn-x-cce-local' })
+    expect(getSnapshot().settings.speechVoiceURI).toBe('cmn-cn-x-cce-local')
+    // 清空即回到跟随系统
+    actions.updateSettings({ speechVoiceURI: null })
+    expect(getSnapshot().settings.speechVoiceURI).toBeNull()
+    // 非法值退回默认
+    actions.updateSettings({ speechVoiceURI: 42 as never })
+    expect(getSnapshot().settings.speechVoiceURI).toBeNull()
+  })
+
   it('设置写入后会被规范化', () => {
     actions.updateSettings({ fontSize: 100, dailyReviewGoal: -3, theme: 'dark' })
     const settings = getSnapshot().settings

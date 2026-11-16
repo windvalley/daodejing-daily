@@ -11,6 +11,11 @@ export interface Settings {
   serif: boolean
   /** 朗读语速 */
   speechRate: number
+  /**
+   * 朗读音色，存系统音色的 voiceURI；null 表示跟随系统默认。
+   * 存 URI 而不是索引：原生侧按音色名排序，索引不保证跨设备稳定。
+   */
+  speechVoiceURI: string | null
   /** 章页默认展开译文 */
   showTranslation: boolean
   /** 章页原文显示拼音 */
@@ -66,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 18,
   serif: true,
   speechRate: 0.9,
+  speechVoiceURI: null,
   showTranslation: true,
   showPinyin: true,
   dailyReviewGoal: 10,
@@ -106,6 +112,10 @@ function sanitizeSettings(input: unknown): Settings {
     fontSize: clamp(Number(input.fontSize) || DEFAULT_SETTINGS.fontSize, 15, 24),
     serif: typeof input.serif === 'boolean' ? input.serif : DEFAULT_SETTINGS.serif,
     speechRate: clamp(Number(input.speechRate) || DEFAULT_SETTINGS.speechRate, 0.5, 1.5),
+    speechVoiceURI:
+      typeof input.speechVoiceURI === 'string' && input.speechVoiceURI
+        ? input.speechVoiceURI
+        : DEFAULT_SETTINGS.speechVoiceURI,
     showTranslation:
       typeof input.showTranslation === 'boolean' ? input.showTranslation : DEFAULT_SETTINGS.showTranslation,
     showPinyin: typeof input.showPinyin === 'boolean' ? input.showPinyin : DEFAULT_SETTINGS.showPinyin,
