@@ -14,6 +14,14 @@
   --accent-strong: #2c5043;
   --accent-soft: #e4ede7;
   --accent-ink: #ffffff;
+  /*
+   * 背诵页主视觉是深底反白块，不跟随强调色在深色主题里翻转，
+   * 因此单独成对定义背景与前景，保证两套主题的对比度一致。
+   */
+  --hero-bg: #2c5043;
+  --hero-bg-end: #1f3a2f;
+  --hero-ink: #f2efe5;
+  --hero-button-ink: #1b2a21;
   --gold: #9c7a3c;
   --gold-soft: #f2e9d4;
   --danger: #a4453b;
@@ -62,6 +70,8 @@
   --accent-strong: #a9d4be;
   --accent-soft: #26332b;
   --accent-ink: #10241a;
+  --hero-bg: #2f5544;
+  --hero-bg-end: #203a2d;
   --gold: #c9a969;
   --gold-soft: #332c1c;
   --danger: #e08d80;
@@ -1560,7 +1570,7 @@ input[type='range'] {
 
 .chapter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, minmax(0, 1fr)));
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 8px;
 }
 
@@ -2295,13 +2305,13 @@ input[type='range'] {
 .memorize-feature {
   padding: 22px 20px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(150deg, var(--accent-strong), color-mix(in srgb, var(--accent-strong) 70%, #1b2a21));
-  color: #f2efe5;
+  background: linear-gradient(150deg, var(--hero-bg), var(--hero-bg-end));
+  color: var(--hero-ink);
   box-shadow: var(--shadow-md);
 }
 
 .feature-eyebrow {
-  color: color-mix(in srgb, #f2efe5 70%, transparent);
+  color: color-mix(in srgb, var(--hero-ink) 70%, transparent);
   font-size: 11px;
   letter-spacing: 0.2em;
 }
@@ -2319,12 +2329,12 @@ input[type='range'] {
   font-family: var(--font-serif);
   font-size: 16px;
   line-height: 1.9;
-  color: color-mix(in srgb, #f2efe5 92%, transparent);
+  color: color-mix(in srgb, var(--hero-ink) 92%, transparent);
 }
 
 .feature-desc {
   margin-top: 8px;
-  color: color-mix(in srgb, #f2efe5 72%, transparent);
+  color: color-mix(in srgb, var(--hero-ink) 72%, transparent);
   font-size: 12.5px;
 }
 
@@ -2333,7 +2343,7 @@ input[type='range'] {
   flex-wrap: wrap;
   gap: 14px;
   margin-top: 12px;
-  color: color-mix(in srgb, #f2efe5 70%, transparent);
+  color: color-mix(in srgb, var(--hero-ink) 70%, transparent);
   font-size: 11.5px;
 }
 
@@ -2345,8 +2355,8 @@ input[type='range'] {
 }
 
 .memorize-feature .button-primary {
-  background: #f2efe5;
-  color: var(--accent-strong);
+  background: var(--hero-ink);
+  color: var(--hero-button-ink);
 }
 
 .memorize-feature .button-primary:hover {
@@ -2354,12 +2364,12 @@ input[type='range'] {
 }
 
 .memorize-feature .button-ghost {
-  border-color: color-mix(in srgb, #f2efe5 30%, transparent);
-  color: #f2efe5;
+  border-color: color-mix(in srgb, var(--hero-ink) 30%, transparent);
+  color: var(--hero-ink);
 }
 
 .memorize-feature .button-ghost:hover {
-  background: color-mix(in srgb, #f2efe5 12%, transparent);
+  background: color-mix(in srgb, var(--hero-ink) 12%, transparent);
 }
 
 .memorize-modes {
@@ -2411,7 +2421,7 @@ input[type='range'] {
 
 .chapter-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, minmax(0, 1fr)));
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   gap: 6px;
   margin-top: 12px;
 }
@@ -3233,7 +3243,7 @@ input[type='range'] {
 
 .concept-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, minmax(0, 1fr)));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 10px;
 }
 
@@ -3566,7 +3576,7 @@ input[type='range'] {
   }
 
   .chapter-grid {
-    grid-template-columns: repeat(auto-fill, minmax(108px, minmax(0, 1fr)));
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
     gap: 10px;
   }
 
@@ -3608,7 +3618,7 @@ input[type='range'] {
 
 @media (min-width: 900px) {
   .chapter-grid {
-    grid-template-columns: repeat(auto-fill, minmax(116px, minmax(0, 1fr)));
+    grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
   }
 
   .reading-layout {
