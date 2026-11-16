@@ -1841,6 +1841,17 @@ input[type='range'] {
   gap: 4px;
 }
 
+.original-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.font-button.is-on {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .font-button {
   padding: 3px 9px;
   border-radius: 7px;
@@ -1875,6 +1886,26 @@ input[type='range'] {
 
 .original-text p:first-child::first-letter {
   color: var(--accent);
+}
+
+/* 注音用 ruby 排在字上方，行高需留出拼音的位置 */
+.original-text ruby {
+  ruby-align: center;
+}
+
+.original-text rt {
+  font-family: var(--font-sans);
+  font-size: max(10px, 0.42em);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  padding-inline: 1px;
+  color: var(--muted);
+}
+
+.original-text.has-pinyin {
+  line-height: 2.9;
+  padding-top: 20px;
 }
 
 .gist-text {
@@ -1941,6 +1972,66 @@ input[type='range'] {
   color: var(--ink-2);
   font-size: 13.5px;
   line-height: 1.8;
+}
+
+.gloss-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.gloss-line {
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+
+.gloss-source {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gloss-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 8px;
+}
+
+.gloss-item {
+  flex: 1 1 240px;
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.gloss-item dt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.gloss-char {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.gloss-pinyin {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.gloss-item dd {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink-2);
 }
 
 .practice-editor-foot {
@@ -3614,6 +3705,35 @@ input[type='range'] {
 
   .note-row dd {
     font-size: 13px;
+  }
+}
+
+@media (max-width: 560px) {
+  .gloss-grid {
+    gap: 2px;
+  }
+
+  .gloss-item {
+    flex-basis: 100%;
+    grid-template-columns: 4.2em minmax(0, 1fr);
+    gap: 6px;
+    padding: 2px 0;
+  }
+
+  /* 窄屏把字与拼音并排，避免每字占两行把列表拉得过长 */
+  .gloss-item dt {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .gloss-char {
+    font-size: 15px;
+  }
+
+  .gloss-item dd {
+    font-size: 12.5px;
+    line-height: 1.6;
   }
 }
 

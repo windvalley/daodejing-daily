@@ -20,6 +20,7 @@ import {
 } from '../lib/stats'
 import { dayKey, monthStart } from '../lib/date'
 import { searchChapters } from '../lib/search'
+import { getChapterGloss, glossCharCount, glossMatchesChapter } from '../data/glosses'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -65,6 +66,40 @@ describe('章节数据', () => {
       })
       concept.quotes.forEach((quote) => {
         expect(plainText(getChapter(quote.chapter)!)).toContain(quote.text.replace(/[，。；：！？、“”‘’]/g, ''))
+      })
+    })
+  })
+})
+
+describe('注音与逐字解析', () => {
+  const HAN = /^\p{Script=Han}$/u
+  const PINYIN = /^[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü]+$/
+
+  it('已录入的注音与原文逐句逐字对齐', () => {
+    const glossed = chapters.filter((chapter) => getChapterGloss(chapter.number))
+    expect(glossed.length).toBeGreaterThan(0)
+    glossed.forEach((chapter) => {
+      const gloss = getChapterGloss(chapter.number)!
+      expect(glossMatchesChapter(gloss, chapter)).toBe(true)
+      expect(glossCharCount(gloss)).toBe(plainText(chapter).length)
+    })
+  })
+
+  it('汉字都有带声调拼音与释义，标点不注', () => {
+    chapters.forEach((chapter) => {
+      const gloss = getChapterGloss(chapter.number)
+      if (!gloss) return
+      gloss.forEach((line) => {
+        line.forEach((token) => {
+          expect(Array.from(token.char)).toHaveLength(1)
+          if (HAN.test(token.char)) {
+            expect(token.pinyin).toMatch(PINYIN)
+            expect(token.gloss?.length ?? 0).toBeGreaterThan(3)
+          } else {
+            expect(token.pinyin).toBeUndefined()
+            expect(token.gloss).toBeUndefined()
+          }
+        })
       })
     })
   })

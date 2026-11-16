@@ -98,6 +98,12 @@ export function SettingsPage() {
             label="章页默认展开译文"
             description="关闭后进入章页先只看原文，需要时再展开。"
           />
+          <Toggle
+            checked={data.settings.showPinyin}
+            onChange={(showPinyin) => actions.updateSettings({ showPinyin })}
+            label="原文显示注音"
+            description="已收录注音的章节会在原文上方标注拼音，关闭后只看原文，章页也能随时切换。"
+          />
         </section>
 
         <section className="panel">

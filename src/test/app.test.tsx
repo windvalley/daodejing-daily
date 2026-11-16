@@ -77,6 +77,19 @@ describe('章页', () => {
     renderApp('/chapters/99')
     expect(screen.getByText(/没有找到第 99 章/)).toBeInTheDocument()
   })
+
+  it('第一章可切换注音并展开逐字解析', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/1')
+    expect(screen.getAllByText('dào').length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: '注音' }))
+    expect(screen.queryByText('dào')).not.toBeInTheDocument()
+    expect(getSnapshot().settings.showPinyin).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /逐字解析/ }))
+    expect(screen.getByText(/宇宙的本原与根本规律/)).toBeInTheDocument()
+  })
 })
 
 describe('背诵页', () => {
