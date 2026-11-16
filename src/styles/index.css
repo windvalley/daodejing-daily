@@ -1841,6 +1841,17 @@ input[type='range'] {
   gap: 4px;
 }
 
+.original-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.font-button.is-on {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .font-button {
   padding: 3px 9px;
   border-radius: 7px;
@@ -1875,6 +1886,61 @@ input[type='range'] {
 
 .original-text p:first-child::first-letter {
   color: var(--accent);
+}
+
+/*
+ * 注音用伪元素叠在字的上方，而不是 ruby：
+ * 1. ruby 的文字会被算进选区，复制原文会粘出拼音，这里正文只有汉字；
+ * 2. 用 ::before 放一份不可见的拼音占位，撑开字的宽度与行高，避免长拼音互相压叠。
+ */
+.original-text .zi {
+  position: relative;
+  display: inline-block;
+  text-align: center;
+}
+
+.original-text .zi::before,
+.original-text .zi::after {
+  font-family: var(--font-sans);
+  font-size: max(10px, 0.42em);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.original-text .zi::before {
+  content: attr(data-pinyin);
+  display: block;
+  visibility: hidden;
+}
+
+.original-text .zi::after {
+  content: attr(data-pinyin);
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--muted);
+  user-select: none;
+  pointer-events: none;
+}
+
+.original-text .zi.is-first {
+  color: var(--accent);
+}
+
+/* 注音排在字的上方，行距要留出空间，否则上下两行会叠在一起 */
+.original-text.has-pinyin {
+  padding-top: 18px;
+}
+
+.original-text.has-pinyin p {
+  line-height: 1.55;
+}
+
+.original-text.has-pinyin p + p {
+  margin-top: 0.9em;
 }
 
 .gist-text {
@@ -1941,6 +2007,80 @@ input[type='range'] {
   color: var(--ink-2);
   font-size: 13.5px;
   line-height: 1.8;
+}
+
+.gloss-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.gloss-line {
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+
+.gloss-source {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gloss-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 8px;
+}
+
+.gloss-item {
+  flex: 1 1 240px;
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.gloss-item dt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.gloss-char {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.gloss-pinyin {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.gloss-item dd {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink-2);
+}
+
+/* 通假、旧读一类提示排在释义最前，用底色区分，避免与释义混读 */
+.gloss-hint {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11.5px;
+  line-height: 1.6;
+  vertical-align: 1px;
+  white-space: nowrap;
 }
 
 .practice-editor-foot {
@@ -3614,6 +3754,35 @@ input[type='range'] {
 
   .note-row dd {
     font-size: 13px;
+  }
+}
+
+@media (max-width: 560px) {
+  .gloss-grid {
+    gap: 2px;
+  }
+
+  .gloss-item {
+    flex-basis: 100%;
+    grid-template-columns: 4.2em minmax(0, 1fr);
+    gap: 6px;
+    padding: 2px 0;
+  }
+
+  /* 窄屏把字与拼音并排，避免每字占两行把列表拉得过长 */
+  .gloss-item dt {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .gloss-char {
+    font-size: 15px;
+  }
+
+  .gloss-item dd {
+    font-size: 12.5px;
+    line-height: 1.6;
   }
 }
 

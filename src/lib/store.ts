@@ -13,6 +13,8 @@ export interface Settings {
   speechRate: number
   /** 章页默认展开译文 */
   showTranslation: boolean
+  /** 章页原文显示拼音 */
+  showPinyin: boolean
   /** 每日复习目标 */
   dailyReviewGoal: number
 }
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   serif: true,
   speechRate: 0.9,
   showTranslation: true,
+  showPinyin: true,
   dailyReviewGoal: 10,
 }
 
@@ -105,6 +108,7 @@ function sanitizeSettings(input: unknown): Settings {
     speechRate: clamp(Number(input.speechRate) || DEFAULT_SETTINGS.speechRate, 0.5, 1.5),
     showTranslation:
       typeof input.showTranslation === 'boolean' ? input.showTranslation : DEFAULT_SETTINGS.showTranslation,
+    showPinyin: typeof input.showPinyin === 'boolean' ? input.showPinyin : DEFAULT_SETTINGS.showPinyin,
     dailyReviewGoal: clamp(Math.round(Number(input.dailyReviewGoal) || DEFAULT_SETTINGS.dailyReviewGoal), 1, 30),
   }
 }

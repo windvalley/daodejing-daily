@@ -53,9 +53,10 @@ describe('全篇页', () => {
 describe('章页', () => {
   it('显示原文、译文与注释，并能标记已读', async () => {
     const user = userEvent.setup()
-    renderApp('/chapters/8')
+    const { container } = renderApp('/chapters/8')
     expect(screen.getByRole('heading', { level: 1, name: '易性' })).toBeInTheDocument()
-    expect(screen.getByText(/上善若水。/)).toBeInTheDocument()
+    // 注音把原文拆成了逐字节点，按整段文本比对
+    expect(container.querySelector('.original-text')?.textContent).toContain('上善若水。')
     expect(screen.getByText(/最高的善就像水/)).toBeInTheDocument()
     expect(screen.getByText('几于道')).toBeInTheDocument()
 
@@ -76,6 +77,23 @@ describe('章页', () => {
   it('无效章号给出提示', () => {
     renderApp('/chapters/99')
     expect(screen.getByText(/没有找到第 99 章/)).toBeInTheDocument()
+  })
+
+  it('第一章可切换注音并展开逐字解析', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp('/chapters/1')
+    // 拼音写在伪元素的 attr() 里，正文节点只留汉字，复制原文不会带出注音
+    const annotated = container.querySelectorAll('.original-text .zi[data-pinyin="dào"]')
+    expect(annotated.length).toBeGreaterThan(0)
+    expect(container.querySelector('.original-text')?.textContent).not.toMatch(/[a-z]/)
+
+    await user.click(screen.getByRole('button', { name: '注音' }))
+    expect(container.querySelectorAll('.original-text .zi')).toHaveLength(0)
+    expect(getSnapshot().settings.showPinyin).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /逐字解析/ }))
+    expect(screen.getByText(/宇宙的本原与根本规律/)).toBeInTheDocument()
+    expect(screen.getByText('不读 jiǎo')).toBeInTheDocument()
   })
 })
 

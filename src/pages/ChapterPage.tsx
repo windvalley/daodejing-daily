@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon'
 import { useToast } from '../components/toast-context'
 import { getChapter, chapterLabel, type Chapter } from '../data/chapters'
 import { conceptsForChapter } from '../data/concepts'
+import { getChapterGloss, glossCharCount, glossMatchesChapter } from '../data/glosses'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useNow } from '../hooks/useNow'
 import { useAppData } from '../hooks/useAppData'
@@ -42,12 +43,16 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
   const savedPractice = data.practice[chapter.number]
   const [note, setNote] = useState(savedPractice?.text ?? '')
   const [showTranslation, setShowTranslation] = useState(data.settings.showTranslation)
+  const [showPinyin, setShowPinyin] = useState(data.settings.showPinyin)
+  const [showGloss, setShowGloss] = useState(false)
   const [practiceSavedAt, setPracticeSavedAt] = useState<number | null>(savedPractice?.updatedAt ?? null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const practiceRef = useRef<HTMLElement>(null)
   const previous = getChapter(chapter.number - 1)
   const next = getChapter(chapter.number + 1)
   const relatedConcepts = conceptsForChapter(chapter.number)
+  const storedGloss = getChapterGloss(chapter.number)
+  const gloss = storedGloss && glossMatchesChapter(storedGloss, chapter) ? storedGloss : null
 
   useEffect(() => {
     if (searchParams.get('focus') !== 'practice') return undefined
@@ -76,6 +81,12 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
   const toggleFavorite = () => {
     actions.toggleFavorite(chapter.number)
     toast(progress?.favorite ? '已取消收藏' : '已收藏这一章')
+  }
+
+  const togglePinyin = () => {
+    const next = !showPinyin
+    setShowPinyin(next)
+    actions.updateSettings({ showPinyin: next })
   }
 
   const speak = () => {
@@ -154,29 +165,59 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
           <section className="original-card" aria-label="原文">
             <div className="original-toolbar">
               <span className="original-label">原文</span>
-              <div className="font-controls" aria-label="调整字号">
-                <button
-                  type="button"
-                  className="font-button"
-                  onClick={() => actions.updateSettings({ fontSize: Math.max(15, data.settings.fontSize - 1) })}
-                  aria-label="缩小字号"
-                >
-                  A−
-                </button>
-                <button
-                  type="button"
-                  className="font-button"
-                  onClick={() => actions.updateSettings({ fontSize: Math.min(24, data.settings.fontSize + 1) })}
-                  aria-label="放大字号"
-                >
-                  A+
-                </button>
+              <div className="original-tools">
+                {gloss ? (
+                  <button
+                    type="button"
+                    className={showPinyin ? 'font-button is-on' : 'font-button'}
+                    onClick={togglePinyin}
+                    aria-pressed={showPinyin}
+                    title={showPinyin ? '隐藏拼音' : '显示拼音'}
+                  >
+                    注音
+                  </button>
+                ) : null}
+                <div className="font-controls" aria-label="调整字号">
+                  <button
+                    type="button"
+                    className="font-button"
+                    onClick={() => actions.updateSettings({ fontSize: Math.max(15, data.settings.fontSize - 1) })}
+                    aria-label="缩小字号"
+                  >
+                    A−
+                  </button>
+                  <button
+                    type="button"
+                    className="font-button"
+                    onClick={() => actions.updateSettings({ fontSize: Math.min(24, data.settings.fontSize + 1) })}
+                    aria-label="放大字号"
+                  >
+                    A+
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="original-text">
-              {chapter.text.map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
+            <div className={gloss && showPinyin ? 'original-text has-pinyin' : 'original-text'}>
+              {gloss
+                ? gloss.map((line, lineIndex) => (
+                    <p key={lineIndex}>
+                      {line.map((token, tokenIndex) =>
+                        // 拼音走 CSS 伪元素，正文只留汉字，复制原文时不会带出注音
+                        showPinyin && token.pinyin ? (
+                          <span
+                            className={lineIndex === 0 && tokenIndex === 0 ? 'zi is-first' : 'zi'}
+                            data-pinyin={token.pinyin}
+                            key={tokenIndex}
+                          >
+                            {token.char}
+                          </span>
+                        ) : (
+                          token.char
+                        ),
+                      )}
+                    </p>
+                  ))
+                : chapter.text.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
             </div>
           </section>
 
@@ -216,6 +257,48 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
               ))}
             </dl>
           </section>
+
+          {gloss ? (
+            <section className="panel">
+              <button
+                type="button"
+                className="collapse-trigger"
+                onClick={() => setShowGloss((value) => !value)}
+                aria-expanded={showGloss}
+              >
+                <span className="section-heading-inline">逐字解析</span>
+                <span className="collapse-meta">
+                  {glossCharCount(gloss)} 字 · {showGloss ? '收起' : '展开'}
+                  <Icon name="chevronDown" size={17} className={showGloss ? 'rotate-180' : ''} />
+                </span>
+              </button>
+              {showGloss ? (
+                <div className="gloss-lines">
+                  {gloss.map((line, lineIndex) => (
+                    <div className="gloss-line" key={lineIndex}>
+                      <p className="gloss-source">{chapter.text[lineIndex]}</p>
+                      <dl className="gloss-grid">
+                        {line.map((token, tokenIndex) =>
+                          token.gloss ? (
+                            <div className="gloss-item" key={tokenIndex}>
+                              <dt>
+                                <span className="gloss-char">{token.char}</span>
+                                <span className="gloss-pinyin">{token.pinyin}</span>
+                              </dt>
+                              <dd>
+                                {token.hint ? <span className="gloss-hint">{token.hint}</span> : null}
+                                {token.gloss}
+                              </dd>
+                            </div>
+                          ) : null,
+                        )}
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {relatedConcepts.length ? (
             <section className="panel">
