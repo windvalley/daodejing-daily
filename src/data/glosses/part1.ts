@@ -60,7 +60,7 @@ export const glosses1to20: Record<number, ChapterGloss> = {
       { char: '以', pinyin: 'yǐ', gloss: '连词。用来、以便。' },
       { char: '观', pinyin: 'guān', gloss: '动词。观察、体察。' },
       { char: '其', pinyin: 'qí', gloss: '代词。指道。' },
-      { char: '徼', pinyin: 'jiào', gloss: '名词。边际、端倪、迹象。' },
+      { char: '徼', pinyin: 'jiào', gloss: '名词。边际、端倪、迹象。', hint: '不读 jiǎo' },
       { char: '。' },
     ],
     [

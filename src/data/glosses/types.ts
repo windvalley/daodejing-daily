@@ -6,6 +6,8 @@ export interface CharGloss {
   pinyin?: string
   /** 逐字释义，标点省略 */
   gloss?: string
+  /** 读音或字形提示，如通假、旧读，普通读音省略 */
+  hint?: string
 }
 
 /** 一句原文的逐字条目，顺序与原文完全一致，标点也占一项 */

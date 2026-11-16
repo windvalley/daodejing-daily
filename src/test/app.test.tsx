@@ -80,15 +80,19 @@ describe('章页', () => {
 
   it('第一章可切换注音并展开逐字解析', async () => {
     const user = userEvent.setup()
-    renderApp('/chapters/1')
-    expect(screen.getAllByText('dào').length).toBeGreaterThan(0)
+    const { container } = renderApp('/chapters/1')
+    // 拼音写在伪元素的 attr() 里，正文节点只留汉字，复制原文不会带出注音
+    const annotated = container.querySelectorAll('.original-text .zi[data-pinyin="dào"]')
+    expect(annotated.length).toBeGreaterThan(0)
+    expect(container.querySelector('.original-text')?.textContent).not.toMatch(/[a-z]/)
 
     await user.click(screen.getByRole('button', { name: '注音' }))
-    expect(screen.queryByText('dào')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.original-text .zi')).toHaveLength(0)
     expect(getSnapshot().settings.showPinyin).toBe(false)
 
     await user.click(screen.getByRole('button', { name: /逐字解析/ }))
     expect(screen.getByText(/宇宙的本原与根本规律/)).toBeInTheDocument()
+    expect(screen.getByText('不读 jiǎo')).toBeInTheDocument()
   })
 })
 

@@ -95,9 +95,12 @@ describe('注音与逐字解析', () => {
           if (HAN.test(token.char)) {
             expect(token.pinyin).toMatch(PINYIN)
             expect(token.gloss?.length ?? 0).toBeGreaterThan(3)
+            // 通假、旧读之类的提示要短，写成长句说明应并入释义
+            expect(token.hint?.length ?? 0).toBeLessThanOrEqual(8)
           } else {
             expect(token.pinyin).toBeUndefined()
             expect(token.gloss).toBeUndefined()
+            expect(token.hint).toBeUndefined()
           }
         })
       })

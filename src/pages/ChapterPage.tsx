@@ -202,11 +202,15 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
                 ? gloss.map((line, lineIndex) => (
                     <p key={lineIndex}>
                       {line.map((token, tokenIndex) =>
+                        // 拼音走 CSS 伪元素，正文只留汉字，复制原文时不会带出注音
                         showPinyin && token.pinyin ? (
-                          <ruby key={tokenIndex}>
+                          <span
+                            className={lineIndex === 0 && tokenIndex === 0 ? 'zi is-first' : 'zi'}
+                            data-pinyin={token.pinyin}
+                            key={tokenIndex}
+                          >
                             {token.char}
-                            <rt>{token.pinyin}</rt>
-                          </ruby>
+                          </span>
                         ) : (
                           token.char
                         ),
@@ -281,7 +285,10 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
                                 <span className="gloss-char">{token.char}</span>
                                 <span className="gloss-pinyin">{token.pinyin}</span>
                               </dt>
-                              <dd>{token.gloss}</dd>
+                              <dd>
+                                {token.hint ? <span className="gloss-hint">{token.hint}</span> : null}
+                                {token.gloss}
+                              </dd>
                             </div>
                           ) : null,
                         )}
