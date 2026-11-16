@@ -10,6 +10,7 @@ import { useNow } from '../hooks/useNow'
 import { useAppData } from '../hooks/useAppData'
 import { useSpeech } from '../hooks/useSpeech'
 import { formatDateTime, formatDue, formatRelative } from '../lib/date'
+import { chapterSpeechText } from '../lib/speech'
 import { actions } from '../lib/store'
 
 function InvalidChapter({ number }: { number: string }) {
@@ -63,7 +64,8 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
     return () => window.clearTimeout(timer)
   }, [searchParams, chapter.number])
 
-  const speechText = useMemo(() => `第${chapter.number}章，${chapter.title}。${chapter.text.join('')}`, [chapter])
+  // 朗读文本走注音校正：多音字换成同音字再交给 TTS，避免引擎读错
+  const speechText = useMemo(() => chapterSpeechText(chapter), [chapter])
 
   const savePractice = () => {
     actions.savePractice(chapter.number, note)
