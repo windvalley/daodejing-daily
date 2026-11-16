@@ -1,5 +1,6 @@
 import { getChapterGloss, glossMatchesChapter } from '../data/glosses'
 import type { Chapter } from '../data/chapters'
+import { applyToneSandhi } from './toneSandhi'
 
 /**
  * 朗读读音校正。
@@ -72,11 +73,36 @@ export function speechChar(char: string, pinyin?: string): string {
   return HOMOPHONES[`${char}|${pinyin}`] ?? char
 }
 
-/** 一章正文的朗读文本，已做读音校正；注音缺失或对不齐时退回原文 */
+/**
+ * 需要在朗读文本里插入断词的组合。
+ *
+ * 「无不」在汉语里是固定词，引擎会整词取读音、跳过变调，于是「则无不治」读成
+ * wú bù zhì。在「无」与「不」之间加一个空格，让引擎把它们切成两段，
+ * 「不治」内部的变调才生效。只影响朗读文本，页面显示不变。
+ * key 是前一个字，value 是需要与它断开的字。
+ */
+const SEGMENT_BREAK: Record<string, string> = { 无: '不' }
+
+/**
+ * 一章正文的朗读文本，已做读音校正；注音缺失或对不齐时退回原文。
+ * 顺序不能反：先按变调规则重算「不」「一」，再查同音字表，最后做断词。
+ */
 export function chapterSpeechBody(chapter: Chapter): string {
-  const gloss = getChapterGloss(chapter.number)
-  if (!gloss || !glossMatchesChapter(gloss, chapter)) return chapter.text.join('')
-  return gloss.map((line) => line.map((token) => speechChar(token.char, token.pinyin)).join('')).join('')
+  const stored = getChapterGloss(chapter.number)
+  if (!stored || !glossMatchesChapter(stored, chapter)) return chapter.text.join('')
+  const adjusted = applyToneSandhi(stored)
+  return adjusted
+    .map((line) => {
+      let out = ''
+      line.forEach((token, index) => {
+        const previous = line[index - 1]
+        // 变调后的「不」才需要断词，本调 bù 说明引擎不会误判
+        const needsBreak = previous && SEGMENT_BREAK[previous.char] === token.char && token.pinyin === 'bú'
+        out += (needsBreak ? ' ' : '') + speechChar(token.char, token.pinyin)
+      })
+      return out
+    })
+    .join('')
 }
 
 /** 完整朗读文本：章号、章题加正文 */

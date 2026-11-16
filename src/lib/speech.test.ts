@@ -36,8 +36,8 @@ describe('朗读读音校正', () => {
     const body = chapterSpeechBody(chapter)
     expect(body).toContain('不现可欲')
     expect(body).not.toContain('不见可欲')
-    // 其余文字保持不变，只是替换了需要校正的字
-    expect(body.length).toBe(chapter.text.join('').length)
+    // 其余文字保持不变，只是替换了需要校正的字；断词空格另行计数
+    expect(body.replace(/ /g, '').length).toBe(chapter.text.join('').length)
   })
 
   it('整章朗读文本包含章号与章题', () => {
@@ -47,11 +47,21 @@ describe('朗读读音校正', () => {
     expect(text).toContain('不现可欲')
   })
 
-  it('八十一章朗读文本长度与原文一致', () => {
+  it('朗读文本只比原文多出「无不」处的断词空格', () => {
     chapters.forEach((chapter) => {
       const body = chapterSpeechBody(chapter)
-      expect(body.length).toBe(chapter.text.join('').length)
+      const breaks = (body.match(/ /g) ?? []).length
+      expect(body.length).toBe(chapter.text.join('').length + breaks)
+      // 断词只出现在「无 不」之间
+      expect(breaks).toBe((body.match(/无 不/g) ?? []).length)
     })
+  })
+
+  it('「无不」在朗读文本里被断开，避免引擎按整词读', () => {
+    const chapter = chapters.find((item) => item.number === 3)!
+    const body = chapterSpeechBody(chapter)
+    expect(body).toContain('则无 不治')
+    expect(body).not.toContain('则无不治')
   })
 
   it('校正表里的每个字在书中都按该读音出现过', () => {
