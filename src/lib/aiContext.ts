@@ -45,12 +45,7 @@ function formatChapter(chapter: Chapter): string {
   return lines.join('\n')
 }
 
-function formatChapterOutline(chapter: Chapter): string {
-  return `第${chapter.number}章 ${chapter.title}：${chapter.gist}`
-}
-
 let bookPrefixCache: string | null = null
-let outlineCache: string | null = null
 
 /** 全书材料，约两万三千字。模块级缓存，避免每次请求重新拼字符串 */
 export function buildBookMaterial(): string {
@@ -60,26 +55,16 @@ export function buildBookMaterial(): string {
   return bookPrefixCache
 }
 
-/** 省流模式且没有定位时用的目录，让模型至少知道书里有哪些章，而不是彻底没有材料 */
-export function buildChapterOutline(): string {
-  if (outlineCache === null) {
-    outlineCache = chapters.map(formatChapterOutline).join('\n')
-  }
-  return outlineCache
-}
-
 /**
  * 组装 system。
- * economy 为真时只给规则与章节目录，具体章节材料由焦点块带过去。
+ *
+ * 省流模式下只给规则，一个字都不带书里的内容：材料全由焦点块提供。
+ * 早先这里塞过一份八十一章目录，但省流模式的承诺就是「只发当前这一章」，
+ * 目录本身又是三千多字符，等于把省下的流量又花回去，界面文案也会变成假话。
  */
 export function buildSystemPrompt(options: { economy?: boolean } = {}): string {
-  const parts = [AI_RULES]
-  if (options.economy) {
-    parts.push('【全书目录】\n' + buildChapterOutline())
-  } else {
-    parts.push('【全书】\n' + buildBookMaterial())
-  }
-  return parts.join('\n\n')
+  if (options.economy) return AI_RULES
+  return [AI_RULES, '【全书】\n' + buildBookMaterial()].join('\n\n')
 }
 
 /**
@@ -132,7 +117,7 @@ function formatGloss(gloss: GlossLine): string {
   return tokens.join('；')
 }
 
-function formatConceptFocus(slug: string, economy: boolean): string {
+function formatConceptFocus(slug: string): string {
   const concept = getConcept(slug)
   if (!concept) return ''
   const lines = [`【当前位置】概念：${concept.name}（${concept.subtitle}）`, concept.summary]
@@ -141,14 +126,9 @@ function formatConceptFocus(slug: string, economy: boolean): string {
     concept.quotes.forEach((quote) => lines.push(`- 第${quote.chapter}章：${quote.text}`))
   }
   const related = concept.chapters.map((number) => getChapter(number)).filter((item): item is Chapter => Boolean(item))
-  if (economy) {
-    related.forEach((chapter) => {
-      lines.push('')
-      lines.push(formatChapter(chapter))
-    })
-  } else {
-    lines.push(`相关章节：${related.map((chapter) => `第${chapter.number}章`).join('、')}`)
-  }
+  // 概念页最多关联二十六章，整章正文塞进去既违背省流承诺，也会把提示词撑到一万四千字符。
+  // 省流时只给章号，让模型知道范围，正文由读者自己点进去看。
+  lines.push(`相关章节：${related.map((chapter) => `第${chapter.number}章`).join('、')}`)
   return lines.join('\n')
 }
 
@@ -177,7 +157,7 @@ function formatChapterFocus(focus: { chapter: number; sentence?: string }, econo
 /** 焦点块。把「读者停在哪」翻译成模型能读的位置与材料 */
 export function formatFocus(focus: AiFocus, economy = false): string {
   if (focus.kind === 'chapter') return formatChapterFocus(focus, economy)
-  if (focus.kind === 'concept') return formatConceptFocus(focus.concept, economy)
+  if (focus.kind === 'concept') return formatConceptFocus(focus.concept)
   return ''
 }
 
@@ -222,6 +202,19 @@ export function seedQuestions(chapterNumber: number): string[] {
 }
 
 /**
+ * 还原路径里被编码的片段。
+ * 这一段在 render 期间执行，而 decodeURIComponent 遇到损坏的转义（如 %E0%A4%A）会抛 URIError；
+ * 全站没有 error boundary，抛出去就是整页白屏，所以必须兜住，解码失败按没有焦点处理。
+ */
+function safeDecode(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return null
+  }
+}
+
+/**
  * 从当前路由推断焦点。
  * 章页与背诵页都算「停在某一章」，概念页带着概念名，其余页面没有焦点。
  * 单独拆成纯函数，路由与提示词之间的映射可以脱离渲染断言。
@@ -234,9 +227,8 @@ export function focusFromPath(pathname: string): AiFocus {
   }
   const conceptMatch = /^\/concepts\/([^/]+)\/?$/.exec(pathname)
   if (conceptMatch) {
-    // 概念 slug 是英文短名，被编码过的也要还原再查
-    const slug = decodeURIComponent(conceptMatch[1])
-    if (getConcept(slug)) return { kind: 'concept', concept: slug }
+    const slug = safeDecode(conceptMatch[1])
+    if (slug && getConcept(slug)) return { kind: 'concept', concept: slug }
   }
   return { kind: 'none' }
 }

@@ -24,6 +24,8 @@
   --hero-button-ink: #1b2a21;
   --gold: #9c7a3c;
   --gold-soft: #f2e9d4;
+  /* 警告文字。--gold 在浅色主题下只有 3.86:1，达不到正文 4.5:1，这里单独加深一档 */
+  --warn-ink: #7a5a20;
   --danger: #a4453b;
   --danger-soft: #f6e5e2;
   --heat-0: #ece7da;
@@ -74,6 +76,7 @@
   --hero-bg-end: #203a2d;
   --gold: #c9a969;
   --gold-soft: #332c1c;
+  --warn-ink: #d8b877;
   --danger: #e08d80;
   --danger-soft: #3a2622;
   --heat-0: #2a2d22;
@@ -200,6 +203,7 @@ svg {
   gap: 26px;
   width: var(--sidebar-w);
   padding: 26px 18px 22px;
+  overflow-y: auto;
   border-right: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 82%, transparent);
   backdrop-filter: blur(12px);
@@ -3984,10 +3988,12 @@ input[type='range'] {
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   transform: translateY(100%);
+  /*
+   * visibility 不能参与过渡：过渡期间元素仍是 hidden，组件在挂载后立刻 focus() 打进隐藏子树是空操作，
+   * 焦点就留在被遮住的页面上。开合动画交给 transform，可关闭性交给 inert。
+   */
   visibility: hidden;
-  transition:
-    transform 220ms ease,
-    visibility 220ms ease;
+  transition: transform 220ms ease;
 }
 
 .ai-panel.is-open {
@@ -3996,6 +4002,11 @@ input[type='range'] {
 }
 
 @media (max-width: 1023px) {
+  /* 悬浮按钮占距底边 72 到 118 像素的一条，内容区原有 96 像素不够，滚到底时文字会被压住 */
+  .content {
+    padding-bottom: calc(132px + var(--safe-bottom));
+  }
+
   .ai-panel {
     inset: auto 0 0 0;
     max-height: 84vh;
@@ -4157,9 +4168,13 @@ input[type='range'] {
   background: var(--accent-soft);
 }
 
+/*
+ * 未核实提示是警告，但浅色主题下 --gold 只有 3.86:1，达不到正文 4.5:1，
+ * 所以加深一档，两套主题都过 AA。
+ */
 .ai-notice {
   margin: 0;
-  color: var(--gold);
+  color: var(--warn-ink);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -4183,6 +4198,23 @@ input[type='range'] {
 
 .ai-error .text-link {
   align-self: flex-start;
+}
+
+.ai-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-error-actions:empty {
+  display: none;
+}
+
+/* 重试按钮在告警底上要用告警色，默认按钮样式在浅色底上不达标 */
+.ai-error-actions .button {
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
 }
 
 /* 请求失败时的本地兜底：给的是书里的章，而不是一句「失败了」 */
@@ -4253,7 +4285,7 @@ input[type='range'] {
 
 .ai-privacy {
   margin: 0;
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11.5px;
   line-height: 1.5;
 }
@@ -4268,6 +4300,7 @@ input[type='range'] {
   .ai-panel {
     inset: 0 0 0 auto;
     width: 400px;
+    padding-bottom: var(--safe-bottom);
     border-left: 1px solid var(--line);
     transform: translateX(100%);
   }

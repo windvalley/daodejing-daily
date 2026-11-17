@@ -308,3 +308,64 @@ describe('翻章后的会话边界', () => {
     expect(sent[1].content).toContain('【当前位置】第9章')
   })
 })
+
+describe('评审补充：重试与播报', () => {
+  it('超时后给出重试按钮，并能把原问题重新发出去', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({ status: 'error', kind: 'timeout', message: '等待回复超时。' })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '这一章到底在讲什么')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+    expect(await within(dialog).findByText('等待回复超时，可以重试。')).toBeInTheDocument()
+
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '重试成功的回答。' })
+    await user.click(within(dialog).getByRole('button', { name: '重试' }))
+    await within(dialog).findByText('重试成功的回答。')
+
+    const retried = aiMocks.requestChat.mock.calls[1][0] as { role: string; content: string }[]
+    expect(retried[retried.length - 1].content).toContain('【提问】这一章到底在讲什么')
+  })
+
+  it('鉴权失败不给重试按钮，只给去配置的入口', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({ status: 'error', kind: 'auth', message: 'Invalid API key' })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '随便问问')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText('密钥无效或已过期，去「我的」里检查。')
+    expect(within(dialog).queryByRole('button', { name: '重试' })).toBeNull()
+  })
+
+  it('回答区是 live region，读屏能听到新内容', async () => {
+    saveAiConfig(config)
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    const log = within(dialog).getByRole('log')
+    expect(log).toHaveAttribute('aria-live', 'polite')
+    expect(log).toHaveAttribute('aria-busy', 'false')
+  })
+})
+
+describe('评审补充：引文出处', () => {
+  it('句子在书里但章号写错时要标注，不能当依据放行', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '第四十二章说「上善若水，水善利万物而不争」。' })
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '这句话在哪一章？')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByText('有 1 处引文的章号对不上，请以章页原文为准。')).toBeInTheDocument()
+  })
+})

@@ -12,9 +12,14 @@ import { normalize } from './memorize'
 export interface CitationQuote {
   /** 回答里引号中的原文片段，保留原样 */
   text: string
-  /** 能对上的章号，对不上为 null */
+  /** 引文实际所在的章，对不上任何一章时为 null */
   chapter: number | null
+  /** 回答给这句标称的章号；没在引文前点名某章时为 null */
+  claimed: number | null
+  /** 在原文里找得到 */
   verified: boolean
+  /** 找得到，但不在回答说的那一章 */
+  misattributed: boolean
 }
 
 export interface CitationReport {
@@ -24,6 +29,8 @@ export interface CitationReport {
   quotes: CitationQuote[]
   /** 对不上原文的引用条数 */
   unverified: number
+  /** 出处写错的条数：句子在书里，但不在回答说的那一章 */
+  misattributed: number
 }
 
 const CN_DIGITS: Record<string, number> = {
@@ -68,19 +75,55 @@ export function extractChapterRefs(answer: string): number[] {
 
 const QUOTE_PATTERNS = [/「([^」]{2,80})」/g, /“([^”]{2,80})”/g, /"([^"]{2,80})"/g]
 
-/** 抽取引号里的片段。同一句用不同引号重复出现只留一次 */
-export function extractQuotes(answer: string): string[] {
-  const found: string[] = []
+export interface RawQuote {
+  text: string
+  /** 引文在回答里的起始位置，用来找它前面点名的是哪一章 */
+  index: number
+}
+
+/** 抽取引号里的片段。同一句用不同引号重复出现只留第一次 */
+export function extractQuoteSpans(answer: string): RawQuote[] {
+  const found: RawQuote[] = []
   QUOTE_PATTERNS.forEach((pattern) => {
     pattern.lastIndex = 0
     let match = pattern.exec(answer)
     while (match) {
       const quote = match[1].trim()
-      if (quote && !found.includes(quote)) found.push(quote)
+      if (quote && !found.some((item) => item.text === quote)) found.push({ text: quote, index: match.index })
       match = pattern.exec(answer)
     }
   })
-  return found
+  return found.sort((a, b) => a.index - b.index)
+}
+
+/** 只要文本，测试与界面提示用 */
+export function extractQuotes(answer: string): string[] {
+  return extractQuoteSpans(answer).map((quote) => quote.text)
+}
+
+const SENTENCE_BREAK = /[。！？；\n]/
+
+/**
+ * 引文前面最近一次点名的是哪一章。
+ *
+ * 只在同一句里找：跨句去猜会让「第四十二章讲道生一。这一点和「上善若水」相通」这类写法误判。
+ * 找不到明确的标称就返回 null，不硬套。
+ */
+export function claimedChapterOf(answer: string, quoteIndex: number): number | null {
+  const before = answer.slice(0, quoteIndex)
+  const match = /第\s*(\d{1,2}|[一二三四五六七八九十]+)\s*章/g
+  let claimed: number | null = null
+  let found = match.exec(before)
+  while (found) {
+    const gap = before.slice(found.index + found[0].length)
+    // 标称与引文之间隔了句号问号，说明这句引文不归那句话管
+    if (!SENTENCE_BREAK.test(gap)) {
+      const number = chineseChapterNumber(found[1])
+      if (number && number >= 1 && number <= chapters.length) claimed = number
+    }
+    found = match.exec(before)
+  }
+  return claimed
 }
 
 const CJK = /[\u4e00-\u9fa5]/g
@@ -113,6 +156,13 @@ export function findQuoteChapter(quote: string): number | null {
   return null
 }
 
+/** 引文是否出自某一章 */
+export function quoteInChapter(quote: string, chapter: number): boolean {
+  const text = chapterTexts().get(chapter)
+  const plain = normalize(quote)
+  return Boolean(text && plain && text.includes(plain))
+}
+
 /**
  * 校验一条回答。
  * 章号只保留书中真实存在的，引号片段逐条回溯原文，对不上的计入 unverified。
@@ -120,23 +170,39 @@ export function findQuoteChapter(quote: string): number | null {
 export function checkCitations(answer: string): CitationReport {
   const chaptersInAnswer = extractChapterRefs(answer)
   const quotes: CitationQuote[] = []
-  extractQuotes(answer).forEach((quote) => {
-    if (!isCheckable(quote)) return
-    const chapter = findQuoteChapter(quote)
-    quotes.push({ text: quote, chapter, verified: chapter !== null })
+  extractQuoteSpans(answer).forEach((quote) => {
+    if (!isCheckable(quote.text)) return
+    const chapter = findQuoteChapter(quote.text)
+    const claimed = claimedChapterOf(answer, quote.index)
+    quotes.push({
+      text: quote.text,
+      chapter,
+      claimed,
+      verified: chapter !== null,
+      // 只在校验通过、且回答明确说了出处、且说的不是同一章时才算写错
+      misattributed: chapter !== null && claimed !== null && claimed !== chapter,
+    })
   })
   return {
     chapters: chaptersInAnswer,
     quotes,
     unverified: quotes.filter((quote) => !quote.verified).length,
+    misattributed: quotes.filter((quote) => quote.misattributed).length,
   }
 }
 
-/** 界面提示文案。引用全部对得上时返回 null，不打扰读者 */
+/**
+ * 界面提示文案。出处写错比找不到更值得说，所以优先报它。
+ * 引用全部对得上时返回 null，不打扰读者。
+ */
 export function citationNotice(report: CitationReport): string | null {
-  if (!report.quotes.length) return null
-  if (report.unverified === 0) return null
-  return `有 ${report.unverified} 处引文未在原文中找到，请以章页原文为准。`
+  if (report.misattributed > 0) {
+    return `有 ${report.misattributed} 处引文的章号对不上，请以章页原文为准。`
+  }
+  if (report.unverified > 0) {
+    return `有 ${report.unverified} 处引文未在原文中找到，请以章页原文为准。`
+  }
+  return null
 }
 
 /** 回答里点到但书里没有的章号，用于给模型纠错，不弹给读者 */
