@@ -65,7 +65,7 @@ export const glosses1to20: Record<number, ChapterGloss> = {
     ],
     [
       { char: '此', pinyin: 'cǐ', gloss: '代词。这。' },
-      { char: '两', pinyin: 'liǎng', gloss: '数词。两个，指“无”与“有”。' },
+      { char: '两', pinyin: 'liǎng', gloss: '数词。两个，指“无名”与“有名”。' },
       { char: '者', pinyin: 'zhě', gloss: '助词。用在数词后指代事物，“两者”即这两方面。' },
       { char: '，' },
       { char: '同', pinyin: 'tóng', gloss: '副词。同样、一同。' },
