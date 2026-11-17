@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAppData } from '../hooks/useAppData'
 import { useNow } from '../hooks/useNow'
+import { focusFromPath } from '../lib/aiContext'
 import { getStats } from '../lib/stats'
+import { AiPanel } from './AiPanel'
 import { Icon, type IconName } from './Icon'
 
 interface NavItem {
@@ -39,6 +41,9 @@ export function Layout() {
   const now = useNow()
   const stats = getStats(data, now)
   const location = useLocation()
+  // 问道只需要知道读者停在哪一章，路由是唯一的来源，不额外维护状态
+  const focus = focusFromPath(location.pathname)
+  const [aiOpen, setAiOpen] = useState(false)
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -83,6 +88,10 @@ export function Layout() {
               <div className="progress-fill" style={{ width: `${(stats.read / stats.total) * 100}%` }} />
             </div>
           </div>
+          <button type="button" className="ai-entry" onClick={() => setAiOpen(true)}>
+            <Icon name="chat" size={18} />
+            <span className="nav-label">问道</span>
+          </button>
           <p className="sidebar-quote">千里之行，始于足下。</p>
         </div>
       </aside>
@@ -118,6 +127,10 @@ export function Layout() {
           <Outlet />
         </main>
 
+        <button type="button" className="ai-fab" onClick={() => setAiOpen(true)} aria-label="打开问道">
+          <Icon name="chat" size={20} />
+        </button>
+
         <nav className="bottom-nav" aria-label="底部导航">
           {bottomNav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className="bottom-nav-item">
@@ -130,6 +143,8 @@ export function Layout() {
           ))}
         </nav>
       </div>
+
+      <AiPanel open={aiOpen} onClose={() => setAiOpen(false)} focus={focus} />
     </div>
   )
 }

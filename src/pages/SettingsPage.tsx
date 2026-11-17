@@ -12,6 +12,7 @@ import { useSpeech } from '../hooks/useSpeech'
 import { chineseVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
 import { actions, exportData, parseImport, type SpeechTimbre, type ThemeMode } from '../lib/store'
 import { saveBackup } from '../lib/backup'
+import { EMPTY_AI_CONFIG, clearAiConfig, isAiConfigured, loadAiConfig, saveAiConfig, type AiConfig } from '../lib/ai'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
@@ -37,6 +38,9 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const speech = useSpeech()
   const [voices, setVoices] = useState<VoiceOption[]>([])
+  // AI 配置不进 AppData，这里单独读一份，保存时写回独立的键
+  const [aiConfig, setAiConfig] = useState<AiConfig>(() => loadAiConfig())
+  const [aiSaved, setAiSaved] = useState(false)
 
   // 音色列表要等原生插件就绪，进页面后异步读一次
   useEffect(() => {
@@ -318,6 +322,113 @@ export function SettingsPage() {
               )}
             </div>
           ) : null}
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>问道（AI 助手）</h2>
+          </div>
+          <p className="setting-copy">
+            填一个兼容 OpenAI 接口的模型服务，就能在首页与章节页右下角打开「问道」，就当前这一章提问。
+            不填也不影响阅读、背诵与复习。
+          </p>
+          <div className="setting-block">
+            <label className="field-label" htmlFor="ai-endpoint">
+              服务地址
+            </label>
+            <input
+              id="ai-endpoint"
+              className="text-input"
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="https://api.example.com/v1/chat/completions"
+              value={aiConfig.endpoint}
+              onChange={(event) => {
+                setAiSaved(false)
+                setAiConfig({ ...aiConfig, endpoint: event.target.value })
+              }}
+            />
+          </div>
+          <div className="setting-block">
+            <label className="field-label" htmlFor="ai-model">
+              模型名
+            </label>
+            <input
+              id="ai-model"
+              className="text-input"
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="deepseek-chat"
+              value={aiConfig.model}
+              onChange={(event) => {
+                setAiSaved(false)
+                setAiConfig({ ...aiConfig, model: event.target.value })
+              }}
+            />
+          </div>
+          <div className="setting-block">
+            <label className="field-label" htmlFor="ai-key">
+              密钥
+            </label>
+            <input
+              id="ai-key"
+              className="text-input"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="sk-…"
+              value={aiConfig.apiKey}
+              onChange={(event) => {
+                setAiSaved(false)
+                setAiConfig({ ...aiConfig, apiKey: event.target.value })
+              }}
+            />
+          </div>
+          <div className="setting-block">
+            <Toggle
+              checked={aiConfig.economy}
+              onChange={(economy) => {
+                setAiSaved(false)
+                setAiConfig({ ...aiConfig, economy })
+              }}
+              label="省流模式"
+              description="只把当前这一章发给模型，不再附上全书。流量更省，但跨章提问的回答会变差。"
+            />
+          </div>
+          <div className="row gap-sm wrap">
+            <button
+              type="button"
+              className="button button-primary button-small"
+              onClick={() => {
+                const clean = saveAiConfig(aiConfig)
+                setAiConfig(clean)
+                setAiSaved(true)
+                toast(isAiConfigured(clean) ? 'AI 配置已保存' : '已保存，地址、模型与密钥还差一项')
+              }}
+            >
+              保存配置
+            </button>
+            <button
+              type="button"
+              className="button button-ghost button-small"
+              onClick={() => {
+                clearAiConfig()
+                setAiConfig({ ...EMPTY_AI_CONFIG })
+                setAiSaved(false)
+                toast('AI 配置已清除')
+              }}
+            >
+              清除配置
+            </button>
+            <span className="muted-text">{aiSaved ? (isAiConfigured(aiConfig) ? '已保存' : '未配置完整') : ''}</span>
+          </div>
+          <p className="setting-note">
+            密钥与本机浏览器里的其他学习数据一样，以明文保存在这台设备上，不会进备份文件，也不会经过任何中转服务。
+            共享设备上建议用完就清除。
+          </p>
         </section>
 
         <section className="panel">
