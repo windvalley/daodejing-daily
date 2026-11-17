@@ -110,11 +110,20 @@ describe('背诵主视觉', () => {
 })
 
 describe('章页注音排版', () => {
-  it('拼音占位两侧留白，相邻长音节不会贴成一个词', () => {
-    // cháng 比汉字宽，两字相邻时 ::before 不留内边距会贴成 chángdào
-    const padding = ruleBody('\\.original-text \\.zi::before').match(/padding-inline:\s*([\d.]+)em/)
+  it('拼音占位两侧留白，相邻长音节在视觉上分得开', () => {
+    // cháng 比汉字宽，两字相邻时 ::before 不留内边距会贴成 chángdào。
+    // 留白写在伪元素上，em 取的是伪元素自身字号（下限 10px），不是正文的 --reading-size，
+    // 只断言「大于 0」会放过远小于可辨阈值的取值，这里换算成实际像素再判。
+    const rule = ruleBody('\\.original-text \\.zi::before')
+    const padding = rule.match(/padding-inline:\s*([\d.]+)em/)
+    const fontFloor = ruleBody('\\.original-text \\.zi::before,\\s*\\n\\.original-text \\.zi::after').match(
+      /font-size:\s*max\((\d+)px/,
+    )
     expect(padding).not.toBeNull()
-    expect(Number(padding?.[1])).toBeGreaterThan(0)
+    expect(fontFloor).not.toBeNull()
+    // 两侧内边距之和即相邻两个音节的净间隙；2.4px 是实测能分开音节的下限
+    const gap = Number(padding?.[1]) * Number(fontFloor?.[1]) * 2
+    expect(gap).toBeGreaterThanOrEqual(2.4)
   })
 
   it('字与紧跟的标点同组，组内禁止换行', () => {
