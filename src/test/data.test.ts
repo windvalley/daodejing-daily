@@ -69,6 +69,22 @@ describe('章节数据', () => {
       })
     })
   })
+
+  it('译文不与注释、章旨的训释相左', () => {
+    // 「不仁」是不偏私施恩，不是没有仁爱；「刍狗」不是弃绝万物
+    const chapter5 = getChapter(5)!
+    expect(chapter5.translation).toContain('不偏私')
+    expect(chapter5.translation).not.toContain('不施仁爱')
+    expect(chapter5.translation).not.toContain('自生自灭')
+
+    // 「蔽不新成」从底本读作安于敝旧，不取「蔽而新成」
+    const chapter15 = getChapter(15)!
+    expect(chapter15.translation).not.toContain('去故更新')
+    expect(chapter15.gist).not.toContain('去故更新')
+
+    // 「长生久视」的「视」是存活，不是观照
+    expect(getChapter(59)!.translation).toContain('长久存活')
+  })
 })
 
 describe('注音与逐字解析', () => {
