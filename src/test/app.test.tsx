@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,6 +38,16 @@ describe('今日页', () => {
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
     expect(screen.getByText('今日功课')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /读这一章/ })).toBeInTheDocument()
+  })
+
+  it('一章未读时给出从第一章开始的入口，读过之后收起', () => {
+    const { unmount } = renderApp('/')
+    expect(screen.getByRole('link', { name: '从第一章开始' })).toHaveAttribute('href', '/chapters/1')
+    unmount()
+
+    actions.setRead(1, true)
+    renderApp('/')
+    expect(screen.queryByRole('link', { name: '从第一章开始' })).not.toBeInTheDocument()
   })
 })
 
@@ -109,6 +119,28 @@ describe('章页', () => {
 })
 
 describe('背诵页', () => {
+  it('没背过时从当日一章开始，并提供回到第一章的入口', () => {
+    renderApp('/memorize')
+    expect(screen.getByRole('heading', { level: 2, name: /第\d+章/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '从第一章开始' })).toHaveAttribute('href', '/memorize/1')
+  })
+
+  it('停在页面上跨过零点会换成新一天的章节', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(2026, 10, 17, 23, 59))
+      renderApp('/memorize')
+      const before = screen.getByRole('heading', { level: 2, name: /^第\d+章/ }).textContent
+      vi.setSystemTime(new Date(2026, 10, 18, 0, 1))
+      act(() => {
+        vi.advanceTimersByTime(60_000)
+      })
+      expect(screen.getByRole('heading', { level: 2, name: /^第\d+章/ }).textContent).not.toBe(before)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('首字提示可以先遮住再翻开', async () => {
     const user = userEvent.setup()
     renderApp('/memorize/8')

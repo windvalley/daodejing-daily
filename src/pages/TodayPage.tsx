@@ -32,6 +32,8 @@ export function TodayPage() {
   const dateLabel = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(
     new Date(now),
   )
+  // 首次打开时当日推荐可能落在书中段，给一个回到开头的入口，不改变每日轮转本身
+  const showStartFromFirst = stats.read === 0
 
   return (
     <div className="page today-page">
@@ -40,7 +42,7 @@ export function TodayPage() {
           <p className="today-date">
             {dateLabel}
             <span className="dot-sep">·</span>
-            {greeting()}，今天读一章
+            {greeting(new Date(now))}，今天读一章
           </p>
           <h1 className="today-title">
             <span className="chapter-number">第{chapter.number}章</span>
@@ -64,13 +66,19 @@ export function TodayPage() {
               <Icon name="spark" size={17} />
               开始背诵
             </Link>
+            {showStartFromFirst ? (
+              <Link className="button button-ghost" to="/chapters/1">
+                <Icon name="book" size={17} />
+                从第一章开始
+              </Link>
+            ) : null}
           </div>
         </div>
 
         <aside className="today-hero-side">
           <div className="today-side-head">
             <span>今日功课</span>
-            <span className="today-side-date">{dayKey()}</span>
+            <span className="today-side-date">{dayKey(now)}</span>
           </div>
           <div className="today-side-body">
             <Ring value={tasksDone} max={3} size={88} label={`今日完成 ${tasksDone} 项，共 3 项`}>

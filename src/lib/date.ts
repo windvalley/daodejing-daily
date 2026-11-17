@@ -20,8 +20,15 @@ export function dayKey(input: Date | number = new Date()): string {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
+/**
+ * 日历日序号，即本地年月日到 1970-01-01 的天数。
+ * 必须按年月日换算，不能写成「本地零点时间戳除以 24 小时」：夏令时切换那天本地只有
+ * 23 或 25 小时，除法会得到小数，取整后相邻两天可能重复或跳号。按 UTC 换算后，
+ * 每个日历日恒等于 24 小时，差值就是真实天数差。
+ */
 export function dayIndex(input: Date | number = new Date()): number {
-  return Math.floor(startOfDay(input) / DAY_MS)
+  const date = new Date(input)
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS)
 }
 
 export function addDays(timestamp: number, days: number): number {

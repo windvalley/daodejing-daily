@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAppData } from '../hooks/useAppData'
+import { useNow } from '../hooks/useNow'
 import { getStats } from '../lib/stats'
 import { Icon, type IconName } from './Icon'
 
@@ -35,7 +36,8 @@ function navClass({ isActive }: { isActive: boolean }): string {
 
 export function Layout() {
   const data = useAppData()
-  const stats = getStats(data)
+  const now = useNow()
+  const stats = getStats(data, now)
   const location = useLocation()
 
   useEffect(() => {

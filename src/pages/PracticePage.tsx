@@ -82,7 +82,7 @@ export function PracticePage() {
                         第{number}章 · {chapter.title}
                       </span>
                     </Link>
-                    <span className="muted-text">{formatRelative(entry.updatedAt)}</span>
+                    <span className="muted-text">{formatRelative(entry.updatedAt, now)}</span>
                   </div>
                   <p className="note-card-body">{entry.text}</p>
                   <div className="note-card-foot">

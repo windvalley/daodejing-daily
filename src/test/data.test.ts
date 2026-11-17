@@ -303,6 +303,33 @@ describe('统计', () => {
     expect(dailyChapter(date).number).toBe(first)
   })
 
+  it('每日推荐逐日推进，81 天正好走完一轮', () => {
+    const start = new Date(2026, 0, 1)
+    const numbers: number[] = []
+    for (let offset = 0; offset < 82; offset += 1) {
+      const date = new Date(start)
+      date.setDate(date.getDate() + offset)
+      numbers.push(dailyChapterNumber(date))
+    }
+    const cycle = numbers.slice(0, 81)
+    // 一轮里不重不漏，相邻两天只能 +1 或从 81 回到 1
+    expect(new Set(cycle).size).toBe(81)
+    for (let index = 1; index < cycle.length; index += 1) {
+      expect(cycle[index]).toBe(cycle[index - 1] === 81 ? 1 : cycle[index - 1] + 1)
+    }
+    expect(numbers[81]).toBe(numbers[0])
+  })
+
+  it('2024 年之前的日期仍落在 1 至 81 之间', () => {
+    expect(dailyChapterNumber(new Date(2023, 11, 31))).toBe(81)
+    expect(dailyChapterNumber(new Date(2023, 11, 30))).toBe(80)
+  })
+
+  it('轮转起点仍是 2024-01-01 的第 1 章', () => {
+    expect(dailyChapterNumber(new Date(2024, 0, 1))).toBe(1)
+    expect(dailyChapterNumber(new Date(2024, 0, 2))).toBe(2)
+  })
+
   it('连续天数会把今天未学习的情况回退到昨天', () => {
     const today = new Date(2026, 10, 12, 10)
     const yesterday = new Date(2026, 10, 11, 10)
@@ -341,6 +368,14 @@ describe('学习轨迹对齐', () => {
   it('补位格不计入活动', () => {
     const cells = recentActivity(getSnapshot(), 35, new Date(2026, 10, 12).getTime())
     expect(cells.filter((cell) => cell.placeholder).every((cell) => cell.count === 0)).toBe(true)
+  })
+
+  it('近 35 天是连续日历日，末格就是今天', () => {
+    const cells = recentActivity(getSnapshot(), 35, new Date(2026, 10, 12, 10).getTime())
+    const keys = cells.filter((cell) => !cell.placeholder).map((cell) => dayKey(cell.date))
+    expect(keys).toHaveLength(35)
+    expect(new Set(keys).size).toBe(35)
+    expect(keys[keys.length - 1]).toBe('2026-11-12')
   })
 })
 

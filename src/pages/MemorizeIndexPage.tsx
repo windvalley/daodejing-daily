@@ -5,6 +5,7 @@ import { PageHeader, ProgressBar, Segmented } from '../components/common'
 import { chapters } from '../data/chapters'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useAppData } from '../hooks/useAppData'
+import { useNow } from '../hooks/useNow'
 import { formatRelative } from '../lib/date'
 import { dailyChapter } from '../lib/stats'
 
@@ -20,7 +21,8 @@ export function MemorizeIndexPage() {
   usePageTitle('背诵')
   const data = useAppData()
   const [filter, setFilter] = useState<Filter>('all')
-  const today = dailyChapter()
+  const now = useNow()
+  const today = dailyChapter(new Date(now))
 
   const lastRecited = useMemo(() => {
     const entries = Object.entries(data.recite).sort((a, b) => b[1].lastAt - a[1].lastAt)
@@ -55,7 +57,7 @@ export function MemorizeIndexPage() {
               <div className="feature-meta">
                 <span>最佳 {lastRecited.record.bestScore} 分</span>
                 <span>练过 {lastRecited.record.attempts} 次</span>
-                <span>{formatRelative(lastRecited.record.lastAt)}</span>
+                <span>{formatRelative(lastRecited.record.lastAt, now)}</span>
               </div>
               <div className="feature-actions">
                 <Link className="button button-primary" to={`/memorize/${lastRecited.number}`}>
@@ -81,6 +83,9 @@ export function MemorizeIndexPage() {
                 </Link>
                 <Link className="button button-ghost" to={`/chapters/${today.number}`}>
                   先读原文
+                </Link>
+                <Link className="button button-ghost" to="/memorize/1">
+                  从第一章开始
                 </Link>
               </div>
             </>

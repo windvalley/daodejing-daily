@@ -5,6 +5,7 @@ import { useToast } from '../components/toast-context'
 import { PageHeader, Segmented, Toggle } from '../components/common'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useAppData } from '../hooks/useAppData'
+import { useNow } from '../hooks/useNow'
 import { formatDateTime } from '../lib/date'
 import { getStats } from '../lib/stats'
 import { useSpeech } from '../hooks/useSpeech'
@@ -30,7 +31,8 @@ export function SettingsPage() {
   usePageTitle('我的')
   const data = useAppData()
   const toast = useToast()
-  const stats = getStats(data)
+  const now = useNow()
+  const stats = getStats(data, now)
   const fileRef = useRef<HTMLInputElement>(null)
   const speech = useSpeech()
   const [voices, setVoices] = useState<VoiceOption[]>([])
