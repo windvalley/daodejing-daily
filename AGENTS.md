@@ -2,7 +2,7 @@
 
 本文件面向在本仓库工作的编码智能体，说明项目结构、常用命令、编码约定与容易出错的地方。
 开始修改前先读 `README.md` 了解产品行为，涉及安卓壳时再读 `docs/mobile.md`。
-任务开发流程见「任务工作流」，发版规则见「合并、推送与发版」。
+任务开发流程见「任务工作流」，交付前的评审要求见「交付前的独立评审」，发版规则见「合并、推送与发版」。
 
 ## 项目概览
 
@@ -28,12 +28,13 @@
 - `pnpm build`：先执行 `tsc -b`，再用 Vite 构建生产包到 `dist/`。
 - `pnpm preview`：本地预览构建结果。
 - `pnpm preview:lan`：允许局域网访问预览。
-- `pnpm apk`：构建网页资源、同步 Capacitor 工程并打包 release APK，只在 main 的 worktree 中执行。
+- `pnpm apk`：构建网页资源、同步 Capacitor 工程并打包 APK，产物落在 `android/app/build/outputs/apk/release/`。
 
-提交前至少运行 `pnpm test`、`pnpm lint` 与 `pnpm build`。
+提交前至少运行 `pnpm format:check`、`pnpm test`、`pnpm lint` 与 `pnpm build`。
 `pnpm build` 里的 `tsc -b` 会同时检查 `src/`、`vite.config.ts` 与 `tests/`，任何一处类型错误都会让构建失败。
-改动格式后运行 `pnpm format:check`，该脚本覆盖 `src/`、根目录配置与 Markdown、`index.html`，不包含 `docs/`。
+`pnpm format:check` 覆盖 `src/`、根目录配置与 Markdown、`index.html`，不包含 `docs/`。
 `pnpm apk` 需要 JDK 21 与 Android SDK 36，签名配置位于不入库的 `android/keystore/`。
+以上检查覆盖不到渲染与平台行为，横向溢出、固定栏错位、复制时带出注音这类问题只能在浏览器或真机上确认。
 
 ## 任务工作流
 
@@ -41,31 +42,29 @@
 - worktree 的父目录固定为 `../daodejing-daily-worktrees/`，目录名用任务名，分支名写成 `<type>/<任务名>`。
 - 例如：`git worktree add ../daodejing-daily-worktrees/chapter-grid -b feat/chapter-grid main`。
 - 新 worktree 里没有 `node_modules`，第一次进入先跑 `pnpm install --frozen-lockfile`，之后才能跑测试与构建。
-- 任务分支上可以跑 `pnpm test`、`pnpm lint`、`pnpm build`，也可以为验证做临时 APK 构建。
+- 任务分支上可以跑 `pnpm format:check`、`pnpm test`、`pnpm lint`、`pnpm build`，也可以为验证做临时 APK 构建。
 - 临时构建只用于验证，不复制到 `release/`，不改版本号，也不算发版。
 - 任务完成后先在任务分支提交，验证通过再合回 main，合并使用 `--no-ff`，与仓库历史的 merge 提交保持一致。
 - 合并前确认 main 的最新提交已包含其他任务，基线与 main 不一致时先把 main 合进任务分支并重跑验证。
-- 合并后删除任务分支，用 `git worktree remove` 清理目录，再推送 main。
+- 合并后先 `git worktree remove` 清理目录，再删除任务分支，最后推送 main。
 - 多个任务并行时各自占用独立的 worktree，不允许共用工作目录或分支，也不允许在 main 工作目录里直接改文件。
 - 出现冲突必须停下核对双方改动并保留有效行为，不得用 ours 或 theirs 整体覆盖。
 - 本约定之前遗留的 `../daodejing-daily-chapter-grid` 不再承接新任务。
 
 ## 目录与职责
 
+完整目录树见 `README.md` 的「目录结构」，这里只列不能靠猜的部分。
+
 - `src/App.tsx`：路由表，所有页面路由集中在这里注册。
-- `src/pages/`：今日、全篇、章节、背诵、复习、实践、概念、设置与 404 页面。
-- `src/components/`：布局、图标、章节卡片、Toast 与通用展示组件。
-- `src/hooks/`：应用数据订阅、外观、朗读、当前时间与页面标题。
-- `src/lib/`：状态存储、间隔重复、默写比对、检索、统计、日期、朗读与变调等纯逻辑。
-- `src/data/chapters/`：八十一章原文、译文、注释、章旨与实践提示，按二十章左右分四个文件。
-- `src/data/glosses/`：八十一章逐字注音与解析，同样分四个文件，以章号为键。
+- `src/lib/`：状态存储、间隔重复、默写比对、检索、统计、日期、朗读与变调等纯逻辑。`store.ts` 是唯一的数据入口与写入链路，组件不要绕过它；这一层行为可断言，改动要配测试。
+- `src/pages/`、`src/components/`、`src/hooks/`：页面、通用组件与 hooks，出错通常表现为渲染或交互异常，测试与构建看不全。
+- `src/data/chapters/`、`src/data/glosses/`：章文与注音，按二十章左右分四个文件，以章号为键，新增章节要落到对应分卷。
 - `src/data/concepts.ts`：十四个核心概念及其关联章节与引文。
 - `src/styles/index.css`：全站样式、主题变量、响应式与安全区规则。
 - `src/test/`：jsdom 环境下的数据契约与页面集成测试。
 - `tests/`：需要 Node API 的测试，目前用于读取 CSS 源文件做样式约定断言。
-- `android/`：Capacitor 生成的安卓工程与自定义插件。
+- `android/`：Capacitor 生成的安卓工程与自定义插件，`applicationId` 与签名密钥不能改。
 - `scripts/build-apk.sh`：`pnpm apk` 调用的构建脚本。
-- `docs/mobile.md`：手机安装、模拟器与原生壳说明。
 - `dist/`、`android/app/src/main/assets/public/` 与 `release/` 是构建或本地产物，不要手工修改。
 
 ## 状态与数据流
@@ -128,7 +127,9 @@
 - 「不」「一」在数据里只写本调，变调由 `applyToneSandhi` 在展示与朗读时推导，不要写进数据。
 - `hint` 只放通假、旧读、易误读等短提示，长度不超过八个字，长说明并入释义。
 - 朗读时的多音字校正只用 `src/lib/speech.ts` 的同音字表，不能改动页面显示的原文。
-- 新增或修改内容后运行 `pnpm test`，`src/test/data.test.ts` 会检查章数、对齐、拼音格式、概念引用与关键训释。
+- 新增或修改内容后运行 `pnpm test`。`src/test/data.test.ts` 会检查章数、注音与原文逐句对齐、拼音格式与概念引用，这些是机械可判的部分。
+- 「译文不与注释、章旨的训释相左」这条只锁了文中点名的几处（当前是第 5、15、59 章），其余章节的训释对错没有测试能判，改动后必须自己逐句核对译文、注释与章旨是否互相矛盾。
+- 内容校正要逐章列出依据的底本或训释来源，说明取舍；只凭印象改字、改译或改注的，不要提交。
 
 ## 测试约定
 
@@ -140,13 +141,25 @@
 - 涉及 store 的测试在每个用例前清空 localStorage，并用 `actions.replaceAll(createDefaultData())` 重置状态。
 - 语音相关测试通过 mock `loadVoiceOptions` 或 Capacitor 插件注入固定音色，不要依赖真实设备。
 - 修复缺陷时先在最接近真实使用的层级复现，再在对应层级补回归测试。
+- 补完回归测试要反向核对断言：把实现临时改回修复前的写法（或 `git stash push <实现文件>`），跑该测试确认它会红，再恢复。改回旧实现仍然通过的断言不算约束，多半是对着当前实现反推出来的。
+- `tests/styles.test.ts` 的断言靠字符串匹配，同样要反向核对，否则断言自己就会骗过人。历史上用 `!value.includes('minmax(0')` 判断列声明安全，恰好放过了 `minmax(92px, minmax(0, 1fr))` 这种非法嵌套，等全站退化成单列才发现。
 - 样式约定测试直接读 `src/styles/index.css`，Vitest 配置里关闭了 CSS 处理。
+
+## 交付前的独立评审
+
+自动合并省掉了人工过目，改动落在测试看不见的地方时，合并前补一次独立评审。
+
+- 触发条件：改动命中 `src/styles/index.css`、`src/pages/**`、`android/**`、`vite.config.ts` 或 `src/lib/store.ts`。
+- 做法：把 `git diff main...HEAD` 的完整 diff 与相关约定交给不参与实现的只读会话，要求每条发现给出文件、位置与可复现的具体场景，没有场景的不收；评审方只读，不许改文件，也不许执行会改变工作区的命令。
+- 材料要完整，至少带上 `package.json`、`src/test/` 与提交说明。只给片段会让评审报出「声称升版本但 diff 里没有」这类假发现。
+- 结论当线索用，采纳前自己核实。引用了仓库里并不存在的约定、或与代码实际行为相左的发现，直接驳回。
+- 这一层能发现的是渲染与平台行为，例如嵌套 `minmax` 让全站退化成单列、`<ruby>/<rt>` 让复制原文粘出拼音；它发现不了训释对错，内容校正仍按「内容与注音约定」人工核对。
 
 ## 提交与协作
 
 - 提交信息沿用 Conventional Commits，格式为 `<type>(<scope>): <中文描述>`，没有明确范围时可省略 scope。
 - 仓库历史使用过的类型包括 `feat`、`fix`、`docs`、`refactor`、`build`、`polish` 与 `merge`，新提交沿用同一风格。
-- 提交正文说明问题、原因与影响范围，涉及内容校正时列出具体章节。
+- 提交正文说明问题、原因与影响范围，涉及内容校正时列出具体章节与依据的底本或训释来源。
 - 一个逻辑变更一个提交，修复、重构与纯格式化不要混在一起。
 - 不要在 main 工作目录里直接改文件或提交，任务一律在独立 worktree 的任务分支上进行。
 - 任务分支的提交在合并后保留，不要 squash，仓库历史用 merge 提交记录每个任务。
@@ -156,7 +169,7 @@
 
 - 本仓库显式放宽全局规则中的合并与推送授权：任务分支验证通过后自动合回 main 并推送 `origin/main`，不需要逐次请示。
 - 放宽只覆盖本仓库的普通任务分支合并与 main 推送，不覆盖强制推送、改写历史与删除远端分支。
-- 自动合并的前置条件：任务分支上的 `pnpm test`、`pnpm lint` 与 `pnpm build` 全部通过，且 diff 只包含本任务改动。
+- 自动合并的前置条件：任务分支上的 `pnpm format:check`、`pnpm test`、`pnpm lint` 与 `pnpm build` 全部通过，命中「交付前的独立评审」触发条件时评审也已完成，且 diff 只包含本任务改动。
 - 任一条件不满足，或与 main 出现冲突，停止合并并报告具体分歧，不擅自覆盖。
 - 推送前确认工作区干净，待推送的提交只包含已合入的任务改动。
 - 只有用户明确说发版、打包或要求出 APK 时才算发版，其余情况不推进版本号、不产出 `release/` 下的安装包、不打 tag。
@@ -168,7 +181,6 @@
 
 - `dist/`、`android/app/src/main/assets/public/` 与 APK 都是生成物，改源码后重新构建，不要直接编辑。
 - `../daodejing-daily-worktrees/` 下的每个 worktree 都要单独安装依赖，不能复用主工作目录的 `node_modules`。
-- 在任务分支构建的 APK 只包含该分支的代码，发版必须在 main 上重新构建。
 - README 里说的「我的」是 `/settings` 路由的导航名，导出备份、导入备份与设置都在这一个页面。
 - 章页注音用伪元素显示，正文节点只保留汉字，复制原文时不应带出拼音。
 - 朗读文本会在「无不」之间插入空格以避免引擎整词取音，这个空格只出现在朗读文本里。
@@ -181,11 +193,13 @@
 
 ## 完成标准
 
-- 代码改完至少通过 `pnpm test`、`pnpm lint` 与 `pnpm build`，并在回复中报告实际结果。
-- 界面改动要在 `pnpm dev` 下检查桌面宽度与手机宽度，确认没有横向溢出、底栏遮挡或安全区错位。
-- 原生相关改动要执行 `pnpm apk` 验证，任务分支上只做临时构建，正式发版构建在 main 上完成。
-- 语音相关改动要在带语音引擎的模拟器或真机上验证，不能只看网页。
-- 内容改动要额外确认注音与原文对齐、译文不与注释相左。
-- 提交前用 `git status` 与 `git diff` 确认只包含当前任务改动。
-- 合并前确认 diff 只含本任务改动，合并后推送 main 并用 `git worktree remove` 清理目录。
+先满足公共项，再按改动类型核对对应的那一组。
+
+- 公共：`pnpm format:check`、`pnpm test`、`pnpm lint` 与 `pnpm build` 全部通过，并在回复里报告实际输出，包括测试文件数与用例数、lint 告警数、构建结果；只写「已通过」不算报告。
+- 公共：提交前用 `git status` 与 `git diff` 确认只包含当前任务改动；合并前再确认一次。
+- 界面：在 `pnpm dev` 下检查桌面宽度与手机宽度，确认没有横向溢出、底栏遮挡或安全区错位；章页开启注音后全选原文复制一次，确认没有拼音混入。
+- 原生：执行 `pnpm apk` 验证。任务分支上只做临时构建，正式发版构建在 main 上完成。
+- 语音：在带语音引擎的模拟器或真机上验证，不能只看网页。
+- 内容：确认注音与原文逐句对齐、译文不与注释和章旨相左，并说明本次改了哪些章、其中哪些补了断言。
+- 合并：diff 只含本任务改动；合并后用 `git worktree remove` 清理目录、删除任务分支，再推送 main。
 - 无法运行某项验证时说明原因与影响范围，不要直接声称完成。
