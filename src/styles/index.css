@@ -1988,14 +1988,20 @@ input[type='range'] {
 
 /*
  * 长音节（cháng、zhòng）比汉字宽，两个这样的字相邻时拼音会贴成 chángdào。
- * 占位用的 ::before 左右各留一点内边距把相邻音节撑开，代价是字块跟着变宽，
- * 汉字间距略微拉开，极窄屏上可能多出一行。
+ * 占位用的 ::before 左右各留内边距把相邻音节撑开。
+ *
+ * 这里的 em 取的是伪元素自身的字号（10px），不是正文的 --reading-size：
+ * 左右各 0.12em 合计约 2.4px，约是拼音字母间距的两倍，音节才能分得开；
+ * 按正文 em 估算会把间距定小到 1px 上下，字面上仍然连成一个词。
+ *
+ * 代价是字块跟着变宽，汉字间距略微拉开：787px 及以上不影响行数；
+ * 390px 宽 18px 字号也不影响，但 390px 的 15px 与 414px 的 18px 会各多两行。
  */
 .original-text .zi::before {
   content: attr(data-pinyin);
   display: block;
   visibility: hidden;
-  padding-inline: 0.06em;
+  padding-inline: 0.12em;
 }
 
 .original-text .zi::after {
