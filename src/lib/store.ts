@@ -3,6 +3,12 @@ import { initialReview, scheduleReview, type Grade, type ReviewRecord } from '..
 
 export type ThemeMode = 'system' | 'light' | 'dark'
 
+/**
+ * 朗读音色。系统 TTS 往往只提供一个中文音色，也没有性别信息，
+ * 所以低沉与明亮不依赖系统音色，改用音高区分。
+ */
+export type SpeechTimbre = 'low' | 'normal' | 'bright'
+
 export interface Settings {
   theme: ThemeMode
   /** 正文字号，单位 px */
@@ -11,8 +17,10 @@ export interface Settings {
   serif: boolean
   /** 朗读语速 */
   speechRate: number
+  /** 朗读音色：低沉、系统原声、明亮 */
+  speechTimbre: SpeechTimbre
   /**
-   * 朗读音色，存系统音色的 voiceURI；null 表示跟随系统默认。
+   * 系统音色的 voiceURI；null 表示跟随系统默认。
    * 存 URI 而不是索引：原生侧按音色名排序，索引不保证跨设备稳定。
    */
   speechVoiceURI: string | null
@@ -71,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 18,
   serif: true,
   speechRate: 0.9,
+  speechTimbre: 'normal',
   speechVoiceURI: null,
   showTranslation: true,
   showPinyin: true,
@@ -112,6 +121,10 @@ function sanitizeSettings(input: unknown): Settings {
     fontSize: clamp(Number(input.fontSize) || DEFAULT_SETTINGS.fontSize, 15, 24),
     serif: typeof input.serif === 'boolean' ? input.serif : DEFAULT_SETTINGS.serif,
     speechRate: clamp(Number(input.speechRate) || DEFAULT_SETTINGS.speechRate, 0.5, 1.5),
+    speechTimbre:
+      input.speechTimbre === 'low' || input.speechTimbre === 'bright' || input.speechTimbre === 'normal'
+        ? input.speechTimbre
+        : DEFAULT_SETTINGS.speechTimbre,
     speechVoiceURI:
       typeof input.speechVoiceURI === 'string' && input.speechVoiceURI
         ? input.speechVoiceURI

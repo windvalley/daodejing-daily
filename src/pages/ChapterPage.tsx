@@ -101,7 +101,7 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
       speech.stop()
       return
     }
-    speech.speak(speechText, data.settings.speechRate, data.settings.speechVoiceURI)
+    speech.speak(speechText, data.settings.speechRate, data.settings.speechVoiceURI, data.settings.speechTimbre)
   }
 
   return (

@@ -1,10 +1,21 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 import { ToastProvider } from '../components/Toast'
 import { actions, createDefaultData, getSnapshot } from '../lib/store'
+
+const voiceMocks = vi.hoisted(() => ({ voices: [] as unknown[] }))
+
+vi.mock('../lib/speechVoice', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/speechVoice')>()
+  return {
+    ...actual,
+    loadVoiceOptions: () =>
+      Promise.resolve(actual.toVoiceOptions(voiceMocks.voices as Parameters<typeof actual.toVoiceOptions>[0])),
+  }
+})
 
 function renderApp(path = '/') {
   return render(
@@ -172,6 +183,45 @@ describe('设置页', () => {
     renderApp('/settings')
     await user.click(screen.getByRole('button', { name: /恢复默认设置/ }))
     expect(getSnapshot().settings.fontSize).toBe(18)
+  })
+
+  it('只有一个中文音色时不显示系统音色选择器', async () => {
+    voiceMocks.voices = [
+      { voiceURI: 'zh-Hans', name: 'Chinese China', lang: 'zh-Hans', localService: true },
+      { voiceURI: 'en', name: 'English', lang: 'en', localService: true },
+    ]
+    // jsdom 没有 speechSynthesis，补一个空实现让试听按钮可用，才能看到音色说明
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: { getVoices: () => [], cancel: () => {}, speak: () => {} },
+      configurable: true,
+    })
+    try {
+      renderApp('/settings')
+      await screen.findByText(/这台设备只有这一个中文音色/)
+      expect(screen.getByRole('group', { name: '选择朗读音色' })).toBeInTheDocument()
+      expect(screen.queryByLabelText(/系统音色/)).not.toBeInTheDocument()
+    } finally {
+      delete (window as { speechSynthesis?: unknown }).speechSynthesis
+    }
+  })
+
+  it('有多个中文音色时列出系统音色', async () => {
+    voiceMocks.voices = [
+      { voiceURI: 'cmn-cn-x-ccc-local', name: 'Chinese China', lang: 'zh-CN', localService: true },
+      { voiceURI: 'cmn-cn-x-cce-local', name: 'Chinese China', lang: 'zh-CN', localService: true },
+    ]
+    renderApp('/settings')
+    const select = await screen.findByLabelText(/系统音色/)
+    expect(select).toBeInTheDocument()
+    expect(within(select).getAllByRole('option')).toHaveLength(3)
+  })
+
+  it('音色三档写入设置', async () => {
+    const user = userEvent.setup()
+    voiceMocks.voices = []
+    renderApp('/settings')
+    await user.click(screen.getByRole('button', { name: '明亮' }))
+    await waitFor(() => expect(getSnapshot().settings.speechTimbre).toBe('bright'))
   })
 })
 
