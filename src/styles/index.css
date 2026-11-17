@@ -757,6 +757,9 @@ svg {
 }
 
 .toast {
+  /* fixed 元素在 left: 50% 下的可用宽度只有视口一半，长文案会被挤成多行 */
+  width: max-content;
+  max-width: min(92vw, 420px);
   padding: 10px 16px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ink) 92%, transparent);
@@ -1983,10 +1986,16 @@ input[type='range'] {
   white-space: nowrap;
 }
 
+/*
+ * 长音节（cháng、zhòng）比汉字宽，两个这样的字相邻时拼音会贴成 chángdào。
+ * 占位用的 ::before 左右各留一点内边距把相邻音节撑开，代价是字块跟着变宽，
+ * 汉字间距略微拉开，极窄屏上可能多出一行。
+ */
 .original-text .zi::before {
   content: attr(data-pinyin);
   display: block;
   visibility: hidden;
+  padding-inline: 0.06em;
 }
 
 .original-text .zi::after {
@@ -2002,6 +2011,11 @@ input[type='range'] {
 
 .original-text .zi.is-first {
   color: var(--accent);
+}
+
+/* 标点与它前面的字同组，组内不换行，否则句号会被挤到行首 */
+.original-text .no-break {
+  white-space: nowrap;
 }
 
 /* 注音排在字的上方，行距要留出空间，否则上下两行会叠在一起 */

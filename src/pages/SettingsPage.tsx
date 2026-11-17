@@ -11,6 +11,7 @@ import { getStats } from '../lib/stats'
 import { useSpeech } from '../hooks/useSpeech'
 import { chineseVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
 import { actions, exportData, parseImport, type SpeechTimbre, type ThemeMode } from '../lib/store'
+import { saveBackup } from '../lib/backup'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
@@ -53,18 +54,28 @@ export function SettingsPage() {
     ? data.settings.speechVoiceURI
     : null
   const [pending, setPending] = useState<ReturnType<typeof parseImport> | null>(null)
+  const [exporting, setExporting] = useState(false)
+  // 完整路径留在面板里慢慢看，toast 只给结论，否则窄屏会被挤成好几行
+  const [savedPath, setSavedPath] = useState<string | null>(null)
 
-  const download = () => {
-    const blob = new Blob([exportData()], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `道德经学习备份-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(url)
-    toast('备份已导出')
+  const download = async () => {
+    setExporting(true)
+    try {
+      const result = await saveBackup(exportData())
+      if (result.status === 'saved') {
+        setSavedPath(result.location)
+        toast('备份已保存到下载目录')
+      } else if (result.status === 'started') {
+        // 浏览器不告诉页面下载是否完成，不能像原生端那样声称已保存
+        setSavedPath(null)
+        toast('已开始下载，请到下载列表确认')
+      } else {
+        setSavedPath(null)
+        toast(`导出失败：${result.error}`)
+      }
+    } finally {
+      setExporting(false)
+    }
   }
 
   const onFile = async (file: File | undefined) => {
@@ -258,9 +269,9 @@ export function SettingsPage() {
             导出会得到一份 JSON 文件，包含阅读进度、背诵成绩、复习安排、践行笔记与设置。导入会覆盖当前设备上的全部数据。
           </p>
           <div className="row gap-sm wrap">
-            <button type="button" className="button" onClick={download}>
+            <button type="button" className="button" onClick={() => void download()} disabled={exporting}>
               <Icon name="download" size={16} />
-              导出备份
+              {exporting ? '正在导出…' : '导出备份'}
             </button>
             <button type="button" className="button" onClick={() => fileRef.current?.click()}>
               <Icon name="upload" size={16} />
@@ -274,6 +285,7 @@ export function SettingsPage() {
               onChange={(event) => void onFile(event.target.files?.[0])}
             />
           </div>
+          {savedPath ? <p className="setting-note">上次保存位置：{savedPath}</p> : null}
           {pending ? (
             <div className={pending.ok ? 'import-preview is-ok' : 'import-preview is-error'}>
               {pending.ok ? (

@@ -123,6 +123,16 @@ describe('注音与逐字解析', () => {
       })
     })
   })
+
+  it('每句都以带拼音的汉字开头，句首不会出现标点', () => {
+    // 章页把标点并入它前面的字再禁止换行，行首标点没有前字可挂靠，会退回可断行的旧行为
+    chapters.forEach((chapter) => {
+      const gloss = getChapterGloss(chapter.number)!
+      gloss.forEach((line) => {
+        expect(line[0].pinyin).toBeDefined()
+      })
+    })
+  })
 })
 
 describe('同字异体表', () => {
