@@ -2,6 +2,7 @@
 
 本文件面向在本仓库工作的编码智能体，说明项目结构、常用命令、编码约定与容易出错的地方。
 开始修改前先读 `README.md` 了解产品行为，涉及安卓壳时再读 `docs/mobile.md`。
+任务开发流程见「任务工作流」，发版规则见「合并、推送与发版」。
 
 ## 项目概览
 
@@ -13,9 +14,9 @@
 
 ## 常用命令
 
-所有命令都在仓库根目录执行，包管理器使用 pnpm。
+所有命令都在当前 worktree 的根目录执行，包管理器使用 pnpm。
 
-- `pnpm install`：安装依赖。
+- `pnpm install`：安装依赖，每个新 worktree 都要单独执行。
 - `pnpm dev`：启动 Vite 开发服务器。
 - `pnpm dev:lan`：允许局域网访问开发服务器。
 - `pnpm test`：运行全部 Vitest 测试。
@@ -27,12 +28,27 @@
 - `pnpm build`：先执行 `tsc -b`，再用 Vite 构建生产包到 `dist/`。
 - `pnpm preview`：本地预览构建结果。
 - `pnpm preview:lan`：允许局域网访问预览。
-- `pnpm apk`：构建网页资源、同步 Capacitor 工程并打包 release APK。
+- `pnpm apk`：构建网页资源、同步 Capacitor 工程并打包 release APK，只在 main 的 worktree 中执行。
 
 提交前至少运行 `pnpm test`、`pnpm lint` 与 `pnpm build`。
 `pnpm build` 里的 `tsc -b` 会同时检查 `src/`、`vite.config.ts` 与 `tests/`，任何一处类型错误都会让构建失败。
 改动格式后运行 `pnpm format:check`，该脚本覆盖 `src/`、根目录配置与 Markdown、`index.html`，不包含 `docs/`。
 `pnpm apk` 需要 JDK 21 与 Android SDK 36，签名配置位于不入库的 `android/keystore/`。
+
+## 任务工作流
+
+- 每个任务都在独立 worktree 与独立分支中进行，主工作目录只用来保持 main 与执行发版。
+- worktree 的父目录固定为 `../daodejing-daily-worktrees/`，目录名用任务名，分支名写成 `<type>/<任务名>`。
+- 例如：`git worktree add ../daodejing-daily-worktrees/chapter-grid -b feat/chapter-grid main`。
+- 新 worktree 里没有 `node_modules`，第一次进入先跑 `pnpm install --frozen-lockfile`，之后才能跑测试与构建。
+- 任务分支上可以跑 `pnpm test`、`pnpm lint`、`pnpm build`，也可以为验证做临时 APK 构建。
+- 临时构建只用于验证，不复制到 `release/`，不改版本号，也不算发版。
+- 任务完成后先在任务分支提交，验证通过再合回 main，合并使用 `--no-ff`，与仓库历史的 merge 提交保持一致。
+- 合并前确认 main 的最新提交已包含其他任务，基线与 main 不一致时先把 main 合进任务分支并重跑验证。
+- 合并后删除任务分支，用 `git worktree remove` 清理目录，再推送 main。
+- 多个任务并行时各自占用独立的 worktree，不允许共用工作目录或分支，也不允许在 main 工作目录里直接改文件。
+- 出现冲突必须停下核对双方改动并保留有效行为，不得用 ours 或 theirs 整体覆盖。
+- 本约定之前遗留的 `../daodejing-daily-chapter-grid` 不再承接新任务。
 
 ## 目录与职责
 
@@ -132,13 +148,27 @@
 - 仓库历史使用过的类型包括 `feat`、`fix`、`docs`、`refactor`、`build`、`polish` 与 `merge`，新提交沿用同一风格。
 - 提交正文说明问题、原因与影响范围，涉及内容校正时列出具体章节。
 - 一个逻辑变更一个提交，修复、重构与纯格式化不要混在一起。
-- 在 main 分支上不要直接提交，先新建任务分支，合并回 main 需要用户明确授权。
+- 不要在 main 工作目录里直接改文件或提交，任务一律在独立 worktree 的任务分支上进行。
+- 任务分支的提交在合并后保留，不要 squash，仓库历史用 merge 提交记录每个任务。
 - 提交信息与 PR 描述不要添加智能体或工具的署名与生成标记。
-- 推送与发版需要用户明确授权，构建 APK 不等于可以发布。
+
+## 合并、推送与发版
+
+- 本仓库显式放宽全局规则中的合并与推送授权：任务分支验证通过后自动合回 main 并推送 `origin/main`，不需要逐次请示。
+- 放宽只覆盖本仓库的普通任务分支合并与 main 推送，不覆盖强制推送、改写历史与删除远端分支。
+- 自动合并的前置条件：任务分支上的 `pnpm test`、`pnpm lint` 与 `pnpm build` 全部通过，且 diff 只包含本任务改动。
+- 任一条件不满足，或与 main 出现冲突，停止合并并报告具体分歧，不擅自覆盖。
+- 推送前确认工作区干净，待推送的提交只包含已合入的任务改动。
+- 只有用户明确说发版、打包或要求出 APK 时才算发版，其余情况不推进版本号、不产出 `release/` 下的安装包、不打 tag。
+- 发版构建只能在 main 的 worktree 里执行，`pnpm apk` 打包的是当前工作树，在任务分支构建会漏掉其他已合并的改动。
+- 发版前确认要发布的任务都已合入 main 并推送，再在 main 上执行 `pnpm apk`。
+- 发版时按「路由、构建与原生壳」一节同步版本号与文档中的 APK 文件名。
 
 ## 容易踩的坑
 
 - `dist/`、`android/app/src/main/assets/public/` 与 APK 都是生成物，改源码后重新构建，不要直接编辑。
+- `../daodejing-daily-worktrees/` 下的每个 worktree 都要单独安装依赖，不能复用主工作目录的 `node_modules`。
+- 在任务分支构建的 APK 只包含该分支的代码，发版必须在 main 上重新构建。
 - README 里说的「我的」是 `/settings` 路由的导航名，导出备份、导入备份与设置都在这一个页面。
 - 章页注音用伪元素显示，正文节点只保留汉字，复制原文时不应带出拼音。
 - 朗读文本会在「无不」之间插入空格以避免引擎整词取音，这个空格只出现在朗读文本里。
@@ -153,7 +183,9 @@
 
 - 代码改完至少通过 `pnpm test`、`pnpm lint` 与 `pnpm build`，并在回复中报告实际结果。
 - 界面改动要在 `pnpm dev` 下检查桌面宽度与手机宽度，确认没有横向溢出、底栏遮挡或安全区错位。
-- 原生相关改动要重新执行 `pnpm apk`，并在带语音引擎的模拟器或真机上验证，不能只看网页。
+- 原生相关改动要执行 `pnpm apk` 验证，任务分支上只做临时构建，正式发版构建在 main 上完成。
+- 语音相关改动要在带语音引擎的模拟器或真机上验证，不能只看网页。
 - 内容改动要额外确认注音与原文对齐、译文不与注释相左。
 - 提交前用 `git status` 与 `git diff` 确认只包含当前任务改动。
+- 合并前确认 diff 只含本任务改动，合并后推送 main 并用 `git worktree remove` 清理目录。
 - 无法运行某项验证时说明原因与影响范围，不要直接声称完成。
