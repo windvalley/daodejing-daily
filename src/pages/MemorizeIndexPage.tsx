@@ -82,6 +82,9 @@ export function MemorizeIndexPage() {
                 <Link className="button button-ghost" to={`/chapters/${today.number}`}>
                   先读原文
                 </Link>
+                <Link className="button button-ghost" to="/memorize/1">
+                  从第一章开始
+                </Link>
               </div>
             </>
           )}

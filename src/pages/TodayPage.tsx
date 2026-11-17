@@ -32,6 +32,8 @@ export function TodayPage() {
   const dateLabel = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(
     new Date(now),
   )
+  // 首次打开时当日推荐可能落在书中段，给一个回到开头的入口，不改变每日轮转本身
+  const showStartFromFirst = stats.read === 0
 
   return (
     <div className="page today-page">
@@ -64,6 +66,12 @@ export function TodayPage() {
               <Icon name="spark" size={17} />
               开始背诵
             </Link>
+            {showStartFromFirst ? (
+              <Link className="button button-ghost" to="/chapters/1">
+                <Icon name="book" size={17} />
+                从第一章开始
+              </Link>
+            ) : null}
           </div>
         </div>
 
