@@ -100,6 +100,41 @@ describe('章页', () => {
     expect(screen.getByText(/没有找到第 99 章/)).toBeInTheDocument()
   })
 
+  it('注音模式下标点跟在前一个字后面，不单独落到行首', () => {
+    const { container } = renderApp('/chapters/1')
+    // 汉字是 inline-block，字与标点之间原本是可断行的两段；分组后标点必须留在同一组内
+    const groups = [...container.querySelectorAll('.original-text .no-break')]
+    // 逗号、分号、句号都要被并进前一个字，只处理其中一种说明分组逻辑坏了
+    expect(groups.map((node) => node.textContent)).toEqual([
+      '道，',
+      '道；',
+      '名，',
+      '名。',
+      '名，',
+      '始；',
+      '名，',
+      '母。',
+      '欲，',
+      '妙；',
+      '欲，',
+      '徼。',
+      '者，',
+      '名，',
+      '玄。',
+      '玄，',
+      '门。',
+    ])
+    for (const group of groups) expect(group.querySelector('.zi')).not.toBeNull()
+  })
+
+  it('冒号与引号连排时并入同一个字，引号不会孤零零留在行尾', () => {
+    // 第 57 章的「：『」这类连排标点要跟前面的字同组，否则左引号会被挤到行尾或行首
+    const { container } = renderApp('/chapters/57')
+    const groups = [...container.querySelectorAll('.original-text .no-break')].map((node) => node.textContent ?? '')
+    expect(groups.some((text) => text.endsWith('：“'))).toBe(true)
+    expect(groups.some((text) => text.endsWith('。”'))).toBe(true)
+  })
+
   it('第一章可切换注音并展开逐字解析', async () => {
     const user = userEvent.setup()
     const { container } = renderApp('/chapters/1')
@@ -110,6 +145,8 @@ describe('章页', () => {
 
     await user.click(screen.getByRole('button', { name: '注音' }))
     expect(container.querySelectorAll('.original-text .zi')).toHaveLength(0)
+    // 关掉注音后走纯文本分支，不留禁止换行的分组，普通阅读的断行不受影响
+    expect(container.querySelectorAll('.original-text .no-break')).toHaveLength(0)
     expect(getSnapshot().settings.showPinyin).toBe(false)
 
     await user.click(screen.getByRole('button', { name: /逐字解析/ }))

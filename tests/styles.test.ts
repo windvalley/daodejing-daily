@@ -108,3 +108,18 @@ describe('背诵主视觉', () => {
     expect(css).toContain('--hero-ink:')
   })
 })
+
+describe('章页注音排版', () => {
+  it('拼音占位两侧留白，相邻长音节不会贴成一个词', () => {
+    // cháng 比汉字宽，两字相邻时 ::before 不留内边距会贴成 chángdào
+    const padding = ruleBody('\\.original-text \\.zi::before').match(/padding-inline:\s*([\d.]+)em/)
+    expect(padding).not.toBeNull()
+    expect(Number(padding?.[1])).toBeGreaterThan(0)
+  })
+
+  it('字与紧跟的标点同组，组内禁止换行', () => {
+    // 汉字是 inline-block，不锁住标点时段末句号会单独掉到下一行行首
+    const selector = '\\.original-text \\.no-break'
+    expect(ruleBody(selector)).toMatch(/white-space:\s*nowrap/)
+  })
+})
