@@ -1,4 +1,16 @@
+import { variantGroups } from '../data/variants'
+
 const PUNCTUATION = /[，。；：！？、“”‘’《》（）〈〉·…—\s,.!?;:'"()[\]]/g
+
+const VARIANT_CANONICAL = new Map<string, string>()
+variantGroups.forEach((group) => {
+  group.forEach((char) => VARIANT_CANONICAL.set(char, group[0]))
+})
+
+/** 把同字异体映射为章文用字，比对时按等价字处理；表外的字原样返回 */
+function canonicalChar(char: string): string {
+  return VARIANT_CANONICAL.get(char) ?? char
+}
 
 /** 去掉标点与空白，保留汉字与字母数字 */
 export function normalize(text: string): string {
@@ -19,18 +31,37 @@ export interface DiffMark {
   punctuation?: boolean
 }
 
+export interface Substitution {
+  /** 默写里写的字 */
+  input: string
+  /** 原文里的字 */
+  expected: string
+  /** 该字在 marks（去掉标点后的原文顺序）中的下标 */
+  index: number
+}
+
 export interface DiffResult {
+  /**
+   * 原始对齐结果，保留 LCS 的逐字判定。
+   * 配对成写错的字在 ops 里仍是 missing 与 extra 两条，与下面的聚合计数口径不同，统计请用聚合字段。
+   */
   ops: DiffOp[]
-  /** 与原文一致的字数 */
+  /** 与原文一致的字数，同字异体按一致计算 */
   correct: number
-  /** 原文中漏写或写错的字数 */
+  /** 原文中漏写的字数，不含同位写错 */
   missing: number
-  /** 多写的字数 */
+  /** 多写的字数，不含同位写错 */
   extra: number
+  /** 同位写错的字数：字写错了，位置对得上 */
+  wrong: number
+  /** 同位写错的明细，按原文顺序 */
+  substitutions: Substitution[]
   /** 原文总字数 */
   total: number
-  /** 0 到 100 的完成度，多写会拉低分数 */
+  /** 0 到 100 的完成度，多写与写错都会拉低分数 */
   score: number
+  /** 一字不差：没有漏写、写错和多写 */
+  perfect: boolean
   /** 按原文顺序标出对错，漏写处保留原字 */
   marks: DiffMark[]
   /** 按段落组织的对照结果，保留原文标点 */
@@ -46,18 +77,21 @@ function isPunctuationChar(char: string): boolean {
 
 /**
  * 以最长公共子序列对齐原文与默写内容。
- * 对齐后可以指出哪些字写对、哪些字漏掉、哪些字多写。
+ * 对齐后可以指出哪些字写对、哪些字漏掉、哪些字多写、哪些位置写了别的字。
+ * 同字异体按原文用字比较，不算写错。
  */
 export function diffText(target: string, input: string): DiffResult {
   const a = Array.from(normalize(target))
   const b = Array.from(normalize(input))
+  const comparableA = a.map(canonicalChar)
+  const comparableB = b.map(canonicalChar)
   const n = a.length
   const m = b.length
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
 
   for (let i = n - 1; i >= 0; i -= 1) {
     for (let j = m - 1; j >= 0; j -= 1) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+      dp[i][j] = comparableA[i] === comparableB[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
     }
   }
 
@@ -65,7 +99,7 @@ export function diffText(target: string, input: string): DiffResult {
   let i = 0
   let j = 0
   while (i < n && j < m) {
-    if (a[i] === b[j]) {
+    if (comparableA[i] === comparableB[j]) {
       ops.push({ type: 'same', char: a[i] })
       i += 1
       j += 1
@@ -86,9 +120,51 @@ export function diffText(target: string, input: string): DiffResult {
     j += 1
   }
 
+  // 两处相同文字之间若漏写与多写的字数相等，按顺序一一配对，还原成同位写错，
+  // 避免把写错的字报成「多写的字」。字数不等时对齐本身就有歧义，仍按漏写、多写分开计。
+  //
+  // 已知限制：写错的字恰好等于紧邻的下一个原文字时，LCS 会先把它判成 same，把这一段切成两截，
+  // 这里配不上。例如「上善若水」写成「上善水水」仍报漏写「若」加多写「水」。
+  // 两种读法在字数上完全等价，没有额外信息可判，所以不去猜，行为由测试锁定。
+  const substitutions: Substitution[] = []
+  const pairedMissing = new Set<number>()
+  const pairedExtra = new Set<number>()
+  // marks 去掉了多写的字，同一下标要按「前面有几个非多写字」换算
+  const markIndexBefore: number[] = []
+  let markCount = 0
+  ops.forEach((op) => {
+    markIndexBefore.push(markCount)
+    if (op.type !== 'extra') markCount += 1
+  })
+  let runMissing: number[] = []
+  let runExtra: number[] = []
+  const flushRun = () => {
+    if (runMissing.length === runExtra.length) {
+      runMissing.forEach((missingIndex, position) => {
+        const extraIndex = runExtra[position]
+        pairedMissing.add(missingIndex)
+        pairedExtra.add(extraIndex)
+        substitutions.push({
+          input: ops[extraIndex].char,
+          expected: ops[missingIndex].char,
+          index: markIndexBefore[missingIndex],
+        })
+      })
+    }
+    runMissing = []
+    runExtra = []
+  }
+  ops.forEach((op, index) => {
+    if (op.type === 'missing') runMissing.push(index)
+    else if (op.type === 'extra') runExtra.push(index)
+    else flushRun()
+  })
+  flushRun()
+
   const correct = ops.filter((op) => op.type === 'same').length
-  const missing = ops.filter((op) => op.type === 'missing').length
-  const extra = ops.filter((op) => op.type === 'extra').length
+  const wrong = substitutions.length
+  const missing = ops.filter((op, index) => op.type === 'missing' && !pairedMissing.has(index)).length
+  const extra = ops.filter((op, index) => op.type === 'extra' && !pairedExtra.has(index)).length
 
   const marks: DiffMark[] = ops
     .filter((op) => op.type !== 'extra')
@@ -117,12 +193,15 @@ export function diffText(target: string, input: string): DiffResult {
     correct,
     missing,
     extra,
+    wrong,
+    substitutions,
     total: n,
-    score: n === 0 ? 0 : Math.round((correct / Math.max(n, correct + extra)) * 100),
+    score: n === 0 ? 0 : Math.round((correct / Math.max(n, correct + wrong + extra)) * 100),
+    perfect: missing === 0 && wrong === 0 && extra === 0,
     marks,
     lines,
     extraText: ops
-      .filter((op) => op.type === 'extra')
+      .filter((op, index) => op.type === 'extra' && !pairedExtra.has(index))
       .map((op) => op.char)
       .join(''),
   }
@@ -264,7 +343,9 @@ export interface BlankEvaluation {
 export function evaluateBlanks(blanks: Blank[], answers: Record<number, string>): BlankEvaluation {
   const results = blanks.map((blank) => {
     const input = normalize(answers[blank.id] ?? '')
-    return { id: blank.id, answer: blank.answer, input, correct: input === blank.answer }
+    // 填空与默写同用一张异体表，免得同一个字在两种模式里一个算对一个算错
+    const correct = canonicalChar(input) === canonicalChar(blank.answer)
+    return { id: blank.id, answer: blank.answer, input, correct }
   })
   const correct = results.filter((result) => result.correct).length
   return {
@@ -275,9 +356,12 @@ export function evaluateBlanks(blanks: Blank[], answers: Record<number, string>)
   }
 }
 
-/** 默写评分对应的提示语 */
-export function scoreComment(score: number): string {
-  if (score >= 98) return '一字不差，可以进入长间隔复习了。'
+/**
+ * 默写评分对应的提示语。
+ * perfect 表示没有漏写、写错与多写；分数会四舍五入，只看分数会把个别错字说成「一字不差」。
+ */
+export function scoreComment(score: number, perfect = false): string {
+  if (perfect && score >= 98) return '一字不差，可以进入长间隔复习了。'
   if (score >= 85) return '很稳，只有零星几处需要再看一眼。'
   if (score >= 65) return '大框架记得，个别字句还要补一补。'
   if (score >= 40) return '有印象，但还不够熟，建议先看提示再默写。'
