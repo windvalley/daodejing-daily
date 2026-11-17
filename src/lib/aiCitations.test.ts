@@ -3,9 +3,11 @@ import {
   chineseChapterNumber,
   checkCitations,
   citationNotice,
+  claimedChapterOf,
   extractChapterRefs,
   extractQuotes,
   findQuoteChapter,
+  quoteInChapter,
   unknownChapterRefs,
 } from './aiCitations'
 
@@ -89,5 +91,72 @@ describe('提示文案', () => {
     expect(citationNotice(checkCitations('他说「道法自然，无为而成」。'))).toBe(
       '有 1 处引文未在原文中找到，请以章页原文为准。',
     )
+  })
+})
+
+describe('章号与引文的对应', () => {
+  it('句子在书里但章号写错，判为出处错误', () => {
+    const report = checkCitations('第四十二章说「上善若水，水善利万物而不争」。')
+    expect(report.quotes[0]).toMatchObject({ chapter: 8, claimed: 42, verified: true, misattributed: true })
+    expect(report.misattributed).toBe(1)
+    expect(citationNotice(report)).toBe('有 1 处引文的章号对不上，请以章页原文为准。')
+  })
+
+  it('章号与引文一致时不误报', () => {
+    const report = checkCitations('第八章说「上善若水，水善利万物而不争」。')
+    expect(report.quotes[0]).toMatchObject({ chapter: 8, claimed: 8, misattributed: false })
+    expect(report.misattributed).toBe(0)
+    expect(citationNotice(report)).toBeNull()
+  })
+
+  it('没点名的引文不判出处，只判是否存在', () => {
+    const report = checkCitations('「上善若水，水善利万物而不争」这句话很关键。')
+    expect(report.quotes[0]).toMatchObject({ chapter: 8, claimed: null, misattributed: false })
+    expect(citationNotice(report)).toBeNull()
+  })
+
+  it('跨句点名的章号不算这句的出处，避免误判', () => {
+    const report = checkCitations('第四十二章讲万物生成。「上善若水，水善利万物而不争」另说一层。')
+    expect(report.quotes[0].claimed).toBeNull()
+    expect(report.misattributed).toBe(0)
+  })
+
+  it('一句里两处引文各归各的章号', () => {
+    const report = checkCitations('第八章说「上善若水，水善利万物而不争」，又说「夫唯不争，故无尤」。')
+    expect(report.quotes.map((quote) => quote.claimed)).toEqual([8, 8])
+    expect(report.misattributed).toBe(0)
+  })
+
+  it('引用写错章又找不到原文时，只报找不到，不重复计数', () => {
+    const report = checkCitations('第四十二章说「道法自然，无为而成」。')
+    expect(report.quotes[0]).toMatchObject({ verified: false, misattributed: false })
+    expect(report.unverified).toBe(1)
+    expect(report.misattributed).toBe(0)
+    expect(citationNotice(report)).toBe('有 1 处引文未在原文中找到，请以章页原文为准。')
+  })
+})
+
+describe('标称章号定位', () => {
+  it('同一句里点名的章号会被认出来', () => {
+    const answer = '第八章说「上善若水」。'
+    const index = answer.indexOf('「')
+    expect(claimedChapterOf(answer, index)).toBe(8)
+  })
+
+  it('隔着句子结束符就不算', () => {
+    const answer = '第八章讲水。然后「上善若水」出现在别处。'
+    expect(claimedChapterOf(answer, answer.indexOf('「'))).toBeNull()
+  })
+
+  it('引文前没有章号时返回 null', () => {
+    expect(claimedChapterOf('「上善若水」很关键。', 0)).toBeNull()
+  })
+})
+
+describe('引文归属单章', () => {
+  it('能判断某句是否出自某一章', () => {
+    expect(quoteInChapter('上善若水，水善利万物而不争', 8)).toBe(true)
+    expect(quoteInChapter('上善若水，水善利万物而不争', 42)).toBe(false)
+    expect(quoteInChapter('不存在的句子', 8)).toBe(false)
   })
 })

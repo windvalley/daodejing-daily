@@ -5,7 +5,6 @@ import {
   MAX_HISTORY_MESSAGES,
   buildAskMessages,
   buildBookMaterial,
-  buildChapterOutline,
   buildSystemPrompt,
   focusFromPath,
   fallbackChapters,
@@ -33,12 +32,6 @@ describe('全书材料', () => {
     expect(material).toContain(`实践提示：${chapter!.practice}`)
     chapter!.notes.forEach((note) => expect(material).toContain(`- ${note.term}：${note.text}`))
   })
-
-  it('省流目录只到章题与章旨，不夹带译文', () => {
-    const outline = buildChapterOutline()
-    expect(outline.match(/^第\d+章 /gm)).toHaveLength(81)
-    expect(outline).not.toContain('译文：')
-  })
 })
 
 describe('system 提示词', () => {
@@ -49,10 +42,11 @@ describe('system 提示词', () => {
     expect(prompt).toContain('### 第1章 体道')
   })
 
-  it('省流模式只给目录，不给全书正文', () => {
+  it('省流模式只给规则，书里的内容一个字都不带', () => {
     const prompt = buildSystemPrompt({ economy: true })
-    expect(prompt).toContain('【全书目录】')
+    expect(prompt).toBe(AI_RULES)
     expect(prompt).not.toContain('### 第1章 体道')
+    expect(prompt).not.toContain('【全书目录】')
   })
 
   it('规则里写死了分级、分歧与不编造三条', () => {
@@ -208,5 +202,39 @@ describe('本地兜底章节', () => {
 
   it('既无线索也没有焦点时返回空数组，界面据此不渲染兜底块', () => {
     expect(fallbackChapters('嗯', { kind: 'none' })).toEqual([])
+  })
+})
+
+describe('损坏的路径片段', () => {
+  it('损坏的百分号转义不让应用崩溃，按没有焦点处理', () => {
+    // 分享链接被截断时会出现这种路径，decodeURIComponent 会抛 URIError
+    expect(() => focusFromPath('/concepts/%E0%A4%A')).not.toThrow()
+    expect(focusFromPath('/concepts/%E0%A4%A')).toEqual({ kind: 'none' })
+    expect(focusFromPath('/concepts/%')).toEqual({ kind: 'none' })
+  })
+
+  it('正常的编码 slug 仍然能还原', () => {
+    expect(focusFromPath('/concepts/shui')).toEqual({ kind: 'concept', concept: 'shui' })
+  })
+})
+
+describe('省流模式的载荷', () => {
+  it('章页只发当前这一章，system 里一个字都不带别的章节', () => {
+    const messages = buildAskMessages('问', { kind: 'chapter', chapter: 8 }, [], { economy: true })
+    expect(messages[0].content).toBe(AI_RULES)
+    expect(messages[0].content).not.toContain('第1章')
+    const prompt = messages.map((message) => message.content).join('')
+    expect(prompt).toContain('上善若水')
+    expect(prompt).not.toContain('道可道，非常道')
+    expect(prompt.length).toBeLessThan(2500)
+  })
+
+  it('概念页只给章号，不把关联章节的正文整段塞进去', () => {
+    const messages = buildAskMessages('问', { kind: 'concept', concept: 'de' }, [], { economy: true })
+    const prompt = messages.map((message) => message.content).join('')
+    expect(prompt).toContain('相关章节：')
+    // 「德」关联二十六章，正文全塞进来会超过一万字符
+    expect(prompt.length).toBeLessThan(2500)
+    expect(prompt.match(/### 第/g) ?? []).toHaveLength(0)
   })
 })

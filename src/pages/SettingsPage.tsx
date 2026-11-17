@@ -100,7 +100,11 @@ export function SettingsPage() {
 
   return (
     <div className="page settings-page">
-      <PageHeader eyebrow="我的" title="设置与数据" description="所有数据都保存在这台设备的浏览器里，不上传服务器。" />
+      <PageHeader
+        eyebrow="我的"
+        title="设置与数据"
+        description="学习数据都保存在这台设备的浏览器里，不上传服务器。开启「问道」后，只有你在那里当次输入的内容会发往你自己配置的模型服务。"
+      />
 
       <div className="settings-grid">
         <section className="panel">

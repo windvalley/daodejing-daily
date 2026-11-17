@@ -8,6 +8,9 @@ import { fallbackChapters, seedQuestions, type AiFocus } from '../lib/aiContext'
 import { citationNotice, type CitationReport } from '../lib/aiCitations'
 import { Icon } from './Icon'
 
+/** 重试有机会成功的错误。鉴权与额度重试也是同一个结果，只给指路 */
+const RETRYABLE = new Set<AiErrorKind>(['timeout', 'network', 'parse', 'offline'])
+
 const ERROR_COPY: Record<AiErrorKind, string> = {
   'not-configured': '还没有配置 AI 服务。',
   offline: '当前处于离线状态，先看看书里怎么写的。',
@@ -239,12 +242,12 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
 
   return (
     <>
-      <div className="ai-body" ref={bodyRef}>
+      <div className="ai-body" ref={bodyRef} role="log" aria-live="polite" aria-busy={chat.pending}>
         {chat.messages.length === 0 ? (
           <div className="ai-intro">
             <p>
               {chat.config.economy
-                ? '省流模式已打开，只发送当前这一章。'
+                ? '省流模式已打开：只发送当前这一章，别章的内容发不出去。'
                 : '全书八十一章已作为材料发过去，可以直接问别章。'}
             </p>
             {seeds.length ? (
@@ -278,11 +281,27 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
                     onNavigate={onClose}
                   />
                 ) : null}
-                {message.error.kind === 'auth' ? (
-                  <Link className="text-link" to="/settings" onClick={onClose}>
-                    去检查配置
-                  </Link>
-                ) : null}
+                <div className="ai-error-actions">
+                  {/*
+                   * 重试要能拿回原问题：发送时输入框已清空，没有这个按钮读者只能整段重打。
+                   * 鉴权与额度这两类重试也不会成功，只给指路。
+                   */}
+                  {RETRYABLE.has(message.error.kind) ? (
+                    <button
+                      type="button"
+                      className="button button-small"
+                      onClick={() => void chat.send(message.error!.question)}
+                      disabled={chat.pending}
+                    >
+                      重试
+                    </button>
+                  ) : null}
+                  {message.error.kind === 'auth' ? (
+                    <Link className="text-link" to="/settings" onClick={onClose}>
+                      去检查配置
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             </div>
           ) : (
