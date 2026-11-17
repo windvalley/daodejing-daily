@@ -55,17 +55,22 @@ export function SettingsPage() {
     : null
   const [pending, setPending] = useState<ReturnType<typeof parseImport> | null>(null)
   const [exporting, setExporting] = useState(false)
+  // 完整路径留在面板里慢慢看，toast 只给结论，否则窄屏会被挤成好几行
+  const [savedPath, setSavedPath] = useState<string | null>(null)
 
   const download = async () => {
     setExporting(true)
     try {
       const result = await saveBackup(exportData())
       if (result.status === 'saved') {
-        toast(`已保存到 ${result.location}`)
+        setSavedPath(result.location)
+        toast('备份已保存到下载目录')
       } else if (result.status === 'started') {
         // 浏览器不告诉页面下载是否完成，不能像原生端那样声称已保存
+        setSavedPath(null)
         toast('已开始下载，请到下载列表确认')
       } else {
+        setSavedPath(null)
         toast(`导出失败：${result.error}`)
       }
     } finally {
@@ -280,6 +285,7 @@ export function SettingsPage() {
               onChange={(event) => void onFile(event.target.files?.[0])}
             />
           </div>
+          {savedPath ? <p className="setting-note">上次保存位置：{savedPath}</p> : null}
           {pending ? (
             <div className={pending.ok ? 'import-preview is-ok' : 'import-preview is-error'}>
               {pending.ok ? (

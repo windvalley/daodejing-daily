@@ -48,7 +48,8 @@ public class BackupFilePlugin extends Plugin {
                 : saveToAppFiles(fileName, content);
             call.resolve(result);
         } catch (Exception error) {
-            call.reject("保存备份失败：" + messageOf(error));
+            // 页面会统一加「导出失败：」前缀，这里只给原因
+            call.reject(messageOf(error));
         }
     }
 
@@ -89,10 +90,8 @@ public class BackupFilePlugin extends Plugin {
 
     /** Android 9 及以下：没有免权限的公共下载目录，写入应用文件目录 */
     private JSObject saveToAppFiles(String fileName, String content) throws IOException {
-        File base = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-        if (base == null) {
-            base = getContext().getFilesDir();
-        }
+        File external = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        File base = external != null ? external : getContext().getFilesDir();
         File dir = new File(base, SUB_DIR);
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("无法创建备份目录");
@@ -102,7 +101,11 @@ public class BackupFilePlugin extends Plugin {
         try (FileOutputStream stream = new FileOutputStream(file)) {
             stream.write(content.getBytes(StandardCharsets.UTF_8));
         }
-        return new JSObject().put("location", "应用文件/Download/" + SUB_DIR + "/" + file.getName());
+        // 回报真实可查的相对路径：外部目录挂在 Android/data 下，内部目录只能在应用内看到
+        String location = external != null
+            ? "Android/data/" + getContext().getPackageName() + "/files/Download/" + SUB_DIR + "/" + file.getName()
+            : "应用内部存储/" + SUB_DIR + "/" + file.getName();
+        return new JSObject().put("location", location);
     }
 
     /** 重名文件追加序号，不能覆盖上一次的备份 */

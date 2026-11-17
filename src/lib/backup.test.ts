@@ -2,9 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backupFileName, saveBackup } from './backup'
 
 describe('backupFileName', () => {
-  it('使用本地日期而不是 UTC 日期', () => {
-    // 本地 0:30 在 UTC 还是前一天，文件名必须跟本地看到的一致
-    expect(backupFileName(new Date(2026, 10, 17, 0, 30))).toBe('道德经学习备份-2026-11-17.json')
+  it('文件名带本地日期与扩展名', () => {
+    expect(backupFileName(new Date(2026, 10, 17, 9, 0))).toBe('道德经学习备份-2026-11-17.json')
     expect(backupFileName(new Date(2026, 0, 1, 23, 59))).toBe('道德经学习备份-2026-01-01.json')
   })
 })

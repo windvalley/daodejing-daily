@@ -93,7 +93,7 @@ adb forward tcp:9333 localabstract:webview_devtools_remote_$PID
 
 APK 内的学习数据存在应用自己的 WebView 存储空间里，卸载应用会一并删除。换手机前先在「我的」页面导出备份。
 
-导出备份会写入系统下载目录的「道德经日课」文件夹（Android 10 及以上，不需要存储权限）；Android 9 及以下写入应用文件目录 `Android/data/com.daodejing.daily/files/Download/道德经日课`。文件名使用导出当天的本地日期。
+导出备份会写入系统下载目录的「道德经日课」文件夹（Android 10 及以上，不需要存储权限），这个位置在卸载应用后仍然保留。Android 9 及以下写入应用文件目录 `Android/data/com.daodejing.daily/files/Download/道德经日课`，该目录会随卸载删除，换机前要先把文件复制到电脑或其他目录。文件名使用导出当天的本地日期，同名文件不会覆盖，系统会追加 `(1)`、`(2)` 这样的序号。
 
 浏览器版的数据存在该站点的 localStorage 里，与 APK 不互通。
 

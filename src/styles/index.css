@@ -757,6 +757,9 @@ svg {
 }
 
 .toast {
+  /* fixed 元素在 left: 50% 下的可用宽度只有视口一半，长文案会被挤成多行 */
+  width: max-content;
+  max-width: min(92vw, 420px);
   padding: 10px 16px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ink) 92%, transparent);
