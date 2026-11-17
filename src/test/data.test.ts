@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { chapters, getChapter, plainText, sections } from '../data/chapters'
+import { variantGroups } from '../data/variants'
 import { concepts } from '../data/concepts'
 import {
   actions,
@@ -119,6 +120,24 @@ describe('注音与逐字解析', () => {
             expect(token.hint).toBeUndefined()
           }
         })
+      })
+    })
+  })
+})
+
+describe('同字异体表', () => {
+  const allText = chapters.map((chapter) => plainText(chapter)).join('')
+
+  it('每组首字确实出现在章文中，组内字符互不重复且都是汉字', () => {
+    const seen = new Set<string>()
+    variantGroups.forEach((group) => {
+      expect(group.length).toBeGreaterThan(1)
+      expect(allText).toContain(group[0])
+      group.forEach((char) => {
+        expect(Array.from(char)).toHaveLength(1)
+        expect(char).toMatch(/^\p{Script=Han}$/u)
+        expect(seen.has(char)).toBe(false)
+        seen.add(char)
       })
     })
   })

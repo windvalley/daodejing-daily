@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { useToast } from '../components/toast-context'
@@ -37,11 +37,13 @@ const modeHints: Record<Mode, string> = {
 
 function AttemptResult({
   score,
+  perfect,
   detail,
   onRetry,
   chapterNumber,
 }: {
   score: number
+  perfect: boolean
   detail: string
   onRetry: () => void
   chapterNumber: number
@@ -54,7 +56,7 @@ function AttemptResult({
       </Ring>
       <div className="attempt-copy">
         <h3>{score >= 85 ? '这一章很稳了' : score >= 60 ? '基本记住，再补几处' : '还需要多读两遍'}</h3>
-        <p>{scoreComment(score)}</p>
+        <p>{scoreComment(score, perfect)}</p>
         <p className="attempt-detail">{detail}</p>
       </div>
       <div className="attempt-actions">
@@ -303,6 +305,7 @@ function FillMode({ chapter }: { chapter: Chapter }) {
           </div>
           <AttemptResult
             score={evaluation.score}
+            perfect={evaluation.correct === evaluation.total}
             detail={`填对 ${evaluation.correct} / ${evaluation.total} 空。`}
             onRetry={retry}
             chapterNumber={chapter.number}
@@ -390,6 +393,19 @@ function WriteMode({ chapter }: { chapter: Chapter }) {
                 </p>
               ))}
             </div>
+            {diff.substitutions.length ? (
+              <p className="diff-extra">
+                写错的位置：
+                {diff.substitutions.map((substitution, position) => (
+                  <Fragment key={substitution.index}>
+                    {position > 0 ? '，' : null}
+                    <span className="wrong-pair">
+                      <em>{substitution.input}</em> → <strong>{substitution.expected}</strong>
+                    </span>
+                  </Fragment>
+                ))}
+              </p>
+            ) : null}
             {diff.extraText ? (
               <p className="diff-extra">
                 多写的字：<span>{diff.extraText}</span>
@@ -401,7 +417,8 @@ function WriteMode({ chapter }: { chapter: Chapter }) {
           </div>
           <AttemptResult
             score={diff.score}
-            detail={`写对 ${diff.correct} 字，漏写或写错 ${diff.missing} 字，多写 ${diff.extra} 字，原文共 ${diff.total} 字。`}
+            perfect={diff.perfect}
+            detail={`写对 ${diff.correct} 字，写错 ${diff.wrong} 字，漏写 ${diff.missing} 字，多写 ${diff.extra} 字，原文共 ${diff.total} 字。`}
             onRetry={retry}
             chapterNumber={chapter.number}
           />

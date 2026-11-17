@@ -181,6 +181,40 @@ describe('背诵页', () => {
     expect(getSnapshot().recite[8]).toBeDefined()
     expect(getSnapshot().recite[8].lastMode).toBe('fill')
   })
+
+  it('默写时写同字异体不算错，也不报成多写的字', async () => {
+    const user = userEvent.setup()
+    renderApp('/memorize/5')
+    await user.click(screen.getByRole('button', { name: '默写' }))
+    const textarea = screen.getByLabelText('默写第5章')
+    // 第 5 章原文用「籥」，这里写同字异体「龠」
+    await user.type(
+      textarea,
+      '天地不仁，以万物为刍狗；圣人不仁，以百姓为刍狗。天地之间，其犹橐龠乎？虚而不屈，动而愈出。多言数穷，不如守中。',
+    )
+    await user.click(screen.getByRole('button', { name: /对照原文/ }))
+    expect(await screen.findByLabelText('得分 100 分')).toBeInTheDocument()
+    expect(screen.queryByText(/多写的字/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^写错的位置：/)).not.toBeInTheDocument()
+  })
+
+  it('默写写错字时单列为写错的位置，不说成一字不差', async () => {
+    const user = userEvent.setup()
+    renderApp('/memorize/5')
+    await user.click(screen.getByRole('button', { name: '默写' }))
+    const textarea = screen.getByLabelText('默写第5章')
+    // 45 个字的章节错 1 字正好四舍五入到 98 分
+    await user.type(
+      textarea,
+      '天地不仁，以万物为刍狗；圣人不仁，以百姓为刍狗。天地之间，其犹橐籥乎？虚而不屈，动而愈出。多言数穷，不如宇中。',
+    )
+    await user.click(screen.getByRole('button', { name: /对照原文/ }))
+    expect(await screen.findByLabelText('得分 98 分')).toBeInTheDocument()
+    expect(screen.getByText(/^写错的位置：/)).toBeInTheDocument()
+    expect(screen.queryByText(/多写的字/)).not.toBeInTheDocument()
+    expect(screen.getByText(/写错 1 字，漏写 0 字，多写 0 字/)).toBeInTheDocument()
+    expect(screen.queryByText(/一字不差/)).not.toBeInTheDocument()
+  })
 })
 
 describe('复习页', () => {
