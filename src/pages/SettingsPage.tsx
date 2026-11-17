@@ -11,6 +11,7 @@ import { getStats } from '../lib/stats'
 import { useSpeech } from '../hooks/useSpeech'
 import { chineseVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
 import { actions, exportData, parseImport, type SpeechTimbre, type ThemeMode } from '../lib/store'
+import { saveBackup } from '../lib/backup'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
@@ -53,18 +54,23 @@ export function SettingsPage() {
     ? data.settings.speechVoiceURI
     : null
   const [pending, setPending] = useState<ReturnType<typeof parseImport> | null>(null)
+  const [exporting, setExporting] = useState(false)
 
-  const download = () => {
-    const blob = new Blob([exportData()], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `道德经学习备份-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(url)
-    toast('备份已导出')
+  const download = async () => {
+    setExporting(true)
+    try {
+      const result = await saveBackup(exportData())
+      if (result.status === 'saved') {
+        toast(`已保存到 ${result.location}`)
+      } else if (result.status === 'started') {
+        // 浏览器不告诉页面下载是否完成，不能像原生端那样声称已保存
+        toast('已开始下载，请到下载列表确认')
+      } else {
+        toast(`导出失败：${result.error}`)
+      }
+    } finally {
+      setExporting(false)
+    }
   }
 
   const onFile = async (file: File | undefined) => {
@@ -258,9 +264,9 @@ export function SettingsPage() {
             导出会得到一份 JSON 文件，包含阅读进度、背诵成绩、复习安排、践行笔记与设置。导入会覆盖当前设备上的全部数据。
           </p>
           <div className="row gap-sm wrap">
-            <button type="button" className="button" onClick={download}>
+            <button type="button" className="button" onClick={() => void download()} disabled={exporting}>
               <Icon name="download" size={16} />
-              导出备份
+              {exporting ? '正在导出…' : '导出备份'}
             </button>
             <button type="button" className="button" onClick={() => fileRef.current?.click()}>
               <Icon name="upload" size={16} />
