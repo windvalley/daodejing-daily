@@ -1,12 +1,12 @@
 import { chapters, type Chapter } from '../data/chapters'
-import { DAY_MS, dayKey, startOfDay } from './date'
+import { dayIndex, dayKey, startOfDay } from './date'
 import type { AppData, DayActivity } from './store'
 
-const DAILY_EPOCH = startOfDay(new Date(2024, 0, 1))
+const DAILY_EPOCH_DAY = dayIndex(new Date(2024, 0, 1))
 
 /** 每天推荐一章，按 81 天循环 */
 export function dailyChapterNumber(date: Date = new Date()): number {
-  const offset = Math.floor((startOfDay(date) - DAILY_EPOCH) / DAY_MS)
+  const offset = dayIndex(date) - DAILY_EPOCH_DAY
   return (((offset % 81) + 81) % 81) + 1
 }
 
@@ -151,20 +151,28 @@ export interface HeatmapCell {
 export function recentActivity(data: AppData, days = 28, now = Date.now()): HeatmapCell[] {
   const cells: HeatmapCell[] = []
   const end = startOfDay(now)
-  const start = end - (days - 1) * DAY_MS
-  const leading = (new Date(start).getDay() + 6) % 7
-  for (let index = 0; index < leading; index += 1) {
-    cells.push({ key: `pad-${index}`, date: new Date(start), count: 0, level: 0, placeholder: true })
-  }
+  // 按日历日回退，而不是从零点减去若干个 24 小时：夏令时切换那天只有 23 或 25 小时，
+  // 减固定毫秒数会让某一天被跳过（春季）或被压掉一格（秋季），单元格与真实日期就错位了。
+  const dates: Date[] = []
   for (let offset = days - 1; offset >= 0; offset -= 1) {
-    const date = new Date(end - offset * DAY_MS)
+    const date = new Date(end)
+    date.setDate(date.getDate() - offset)
+    dates.push(date)
+  }
+  const first = dates[0] ?? new Date(end)
+  const leading = (first.getDay() + 6) % 7
+  for (let index = 0; index < leading; index += 1) {
+    cells.push({ key: `pad-${index}`, date: first, count: 0, level: 0, placeholder: true })
+  }
+  for (const date of dates) {
     const activity = data.activity[dayKey(date)]
     const count = activity ? activity.read + activity.recite + activity.review + activity.practice : 0
     cells.push({ key: dayKey(date), date, count, level: activityLevel(count) })
   }
   // 末尾补齐，让每一行都是完整的一周
+  const last = dates[dates.length - 1] ?? new Date(end)
   while (cells.length % 7 !== 0) {
-    cells.push({ key: `pad-end-${cells.length}`, date: new Date(end), count: 0, level: 0, placeholder: true })
+    cells.push({ key: `pad-end-${cells.length}`, date: last, count: 0, level: 0, placeholder: true })
   }
   return cells
 }
