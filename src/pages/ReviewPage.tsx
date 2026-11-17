@@ -36,7 +36,7 @@ export function ReviewPage() {
     setReviewedCount((count) => count + 1)
     setShowOriginal(false)
     setShowHint(false)
-    toast(`已记录：${GRADES[value].label}，下次 ${formatDue(next.dueAt)}`)
+    toast(`已记录：${GRADES[value].label}，下次 ${formatDue(next.dueAt, now)}`)
   }
 
   if (!chapter) {
@@ -49,7 +49,7 @@ export function ReviewPage() {
             title={reviewedCount > 0 ? `今天已完成 ${reviewedCount} 章复习` : '今天没有到期的复习'}
             description={
               upcoming
-                ? `下一章将在 ${formatDue(upcoming)} 到期。也可以现在多背一章，提前积累。`
+                ? `下一章将在 ${formatDue(upcoming, now)} 到期。也可以现在多背一章，提前积累。`
                 : '背完一章后，系统会自动安排第一次复习。'
             }
             action={
@@ -81,7 +81,7 @@ export function ReviewPage() {
           </div>
           <div className="panel stat-card">
             <span className="stat-label">下次到期</span>
-            <strong className="stat-value">{upcoming ? formatDue(upcoming) : '暂无'}</strong>
+            <strong className="stat-value">{upcoming ? formatDue(upcoming, now) : '暂无'}</strong>
             <p className="muted-text">到期后会出现在这里。</p>
           </div>
           <div className="panel stat-card">
@@ -184,7 +184,7 @@ export function ReviewPage() {
                     onClick={() => grade(item.grade)}
                   >
                     <strong>{item.label}</strong>
-                    <span>{formatDue(preview.dueAt)}</span>
+                    <span>{formatDue(preview.dueAt, now)}</span>
                   </button>
                 )
               })}
