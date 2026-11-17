@@ -41,6 +41,10 @@ export interface Substitution {
 }
 
 export interface DiffResult {
+  /**
+   * 原始对齐结果，保留 LCS 的逐字判定。
+   * 配对成写错的字在 ops 里仍是 missing 与 extra 两条，与下面的聚合计数口径不同，统计请用聚合字段。
+   */
   ops: DiffOp[]
   /** 与原文一致的字数，同字异体按一致计算 */
   correct: number
@@ -118,6 +122,10 @@ export function diffText(target: string, input: string): DiffResult {
 
   // 两处相同文字之间若漏写与多写的字数相等，按顺序一一配对，还原成同位写错，
   // 避免把写错的字报成「多写的字」。字数不等时对齐本身就有歧义，仍按漏写、多写分开计。
+  //
+  // 已知限制：写错的字恰好等于紧邻的下一个原文字时，LCS 会先把它判成 same，把这一段切成两截，
+  // 这里配不上。例如「上善若水」写成「上善水水」仍报漏写「若」加多写「水」。
+  // 两种读法在字数上完全等价，没有额外信息可判，所以不去猜，行为由测试锁定。
   const substitutions: Substitution[] = []
   const pairedMissing = new Set<number>()
   const pairedExtra = new Set<number>()
@@ -335,7 +343,9 @@ export interface BlankEvaluation {
 export function evaluateBlanks(blanks: Blank[], answers: Record<number, string>): BlankEvaluation {
   const results = blanks.map((blank) => {
     const input = normalize(answers[blank.id] ?? '')
-    return { id: blank.id, answer: blank.answer, input, correct: input === blank.answer }
+    // 填空与默写同用一张异体表，免得同一个字在两种模式里一个算对一个算错
+    const correct = canonicalChar(input) === canonicalChar(blank.answer)
+    return { id: blank.id, answer: blank.answer, input, correct }
   })
   const correct = results.filter((result) => result.correct).length
   return {

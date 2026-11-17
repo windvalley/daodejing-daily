@@ -128,14 +128,21 @@ describe('注音与逐字解析', () => {
 describe('同字异体表', () => {
   const allText = chapters.map((chapter) => plainText(chapter)).join('')
 
-  it('每组首字确实出现在章文中，组内字符互不重复且都是汉字', () => {
+  it('表不为空，首条就是第 5 章的「籥」与「龠」', () => {
+    expect(variantGroups.length).toBeGreaterThan(0)
+    expect(variantGroups[0]).toEqual(['籥', '龠'])
+  })
+
+  it('每组首字出现在章文，其余成员不出现，字符互不重复且都是汉字', () => {
     const seen = new Set<string>()
     variantGroups.forEach((group) => {
       expect(group.length).toBeGreaterThan(1)
       expect(allText).toContain(group[0])
-      group.forEach((char) => {
+      group.forEach((char, position) => {
         expect(Array.from(char)).toHaveLength(1)
         expect(char).toMatch(/^\p{Script=Han}$/u)
+        // 组员是输入写法，若同时是章文用字，说明这组把两个字错当成了异体
+        if (position > 0) expect(allText).not.toContain(char)
         expect(seen.has(char)).toBe(false)
         seen.add(char)
       })

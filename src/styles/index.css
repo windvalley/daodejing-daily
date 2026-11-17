@@ -2884,8 +2884,16 @@ input[type='range'] {
   color: var(--muted);
 }
 
-.diff-extra span {
+/* 只给「多写的字」那一段染红；写错位置用的是 .wrong-pair，两个字要能看出区别 */
+.diff-extra > span:not(.wrong-pair) {
   color: var(--danger);
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+
+/* 写错的字用删除线标出，应为的字保持正文墨色，不再整对染红 */
+.diff-extra .wrong-pair strong {
+  color: var(--ink);
   font-family: var(--font-serif);
   font-size: 14px;
 }

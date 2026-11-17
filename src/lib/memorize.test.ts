@@ -74,11 +74,21 @@ describe('diffText', () => {
   })
 
   it('漏写与多写不相邻时仍各自计数', () => {
+    // 写错的字正好等于紧邻的下一个字，对齐有歧义，按漏写加多写计，行为在此锁定
     const result = diffText('上善若水', '上善水水')
     expect(result.wrong).toBe(0)
     expect(result.missing).toBe(1)
     expect(result.extra).toBe(1)
     expect(result.extraText).toBe('水')
+  })
+
+  it('写错字在 marks 里的下标不受前面多写的字影响', () => {
+    const result = diffText('不如守中', 'X不如宇中')
+    expect(result.extraText).toBe('X')
+    expect(result.substitutions).toHaveLength(1)
+    expect(result.substitutions[0]).toMatchObject({ input: '宇', expected: '守' })
+    const { index } = result.substitutions[0]
+    expect(result.marks[index]).toEqual({ char: '守', ok: false })
   })
 
   it('连续写错多个字时逐字配对，仍按写错计', () => {
@@ -160,6 +170,18 @@ describe('evaluateBlanks', () => {
     const answers = Object.fromEntries(exercise.blanks.map((blank) => [blank.id, `${blank.answer}，`]))
     const result = evaluateBlanks(exercise.blanks, answers)
     expect(result.score).toBe(100)
+  })
+
+  it('同字异体按一致处理，与默写的判定口径相同', () => {
+    const result = evaluateBlanks([{ id: 0, answer: '籥' }], { 0: '龠' })
+    expect(result.correct).toBe(1)
+    expect(result.score).toBe(100)
+    expect(result.results[0].input).toBe('龠')
+  })
+
+  it('表外的字仍按原字判定', () => {
+    const result = evaluateBlanks([{ id: 0, answer: '籥' }], { 0: '之' })
+    expect(result.correct).toBe(0)
   })
 })
 
