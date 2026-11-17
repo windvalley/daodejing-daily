@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon'
 import { useToast } from '../components/toast-context'
 import { getChapter, chapterLabel, type Chapter } from '../data/chapters'
 import { conceptsForChapter } from '../data/concepts'
-import { getChapterGloss, glossCharCount, glossMatchesChapter } from '../data/glosses'
+import { getChapterGloss, glossCharCount, glossMatchesChapter, type CharGloss, type GlossLine } from '../data/glosses'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useNow } from '../hooks/useNow'
 import { useAppData } from '../hooks/useAppData'
@@ -29,6 +29,52 @@ function InvalidChapter({ number }: { number: string }) {
         </Link>
       </div>
     </div>
+  )
+}
+
+interface GlossGroup {
+  /** 组内第一个字在本句中的序号，首字高亮要按原序号判断 */
+  start: number
+  tokens: CharGloss[]
+}
+
+/**
+ * 把标点并入它前面的字。注音模式下汉字是 inline-block，
+ * 浏览器会把「字」与紧跟的标点当成可断行的两段，窄屏上句号会被挤到行首，
+ * 而中文标点不允许出现在行首。
+ */
+function groupByPunctuation(line: GlossLine): GlossGroup[] {
+  const groups: GlossGroup[] = []
+  line.forEach((token, index) => {
+    const previous = groups[groups.length - 1]
+    if (previous && !token.pinyin) previous.tokens.push(token)
+    else groups.push({ start: index, tokens: [token] })
+  })
+  return groups
+}
+
+function GlossChar({ token, first }: { token: CharGloss; first: boolean }) {
+  // 拼音走 CSS 伪元素，正文只留汉字，复制原文时不会带出注音
+  if (!token.pinyin) return <>{token.char}</>
+  return (
+    <span className={first ? 'zi is-first' : 'zi'} data-pinyin={token.pinyin}>
+      {token.char}
+    </span>
+  )
+}
+
+/** 注音行：标点与它前面的字同组，组内禁止换行 */
+function AnnotatedLine({ line, first }: { line: GlossLine; first: boolean }) {
+  return groupByPunctuation(line).map((group) =>
+    group.tokens.length > 1 ? (
+      <span className="no-break" key={group.start}>
+        {group.tokens.map((token, offset) => (
+          <GlossChar key={group.start + offset} token={token} first={first && group.start + offset === 0} />
+        ))}
+      </span>
+    ) : (
+      <GlossChar key={group.start} token={group.tokens[0]} first={first && group.start === 0} />
+    ),
   )
 }
 
@@ -208,19 +254,10 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
               {gloss
                 ? gloss.map((line, lineIndex) => (
                     <p key={lineIndex}>
-                      {line.map((token, tokenIndex) =>
-                        // 拼音走 CSS 伪元素，正文只留汉字，复制原文时不会带出注音
-                        showPinyin && token.pinyin ? (
-                          <span
-                            className={lineIndex === 0 && tokenIndex === 0 ? 'zi is-first' : 'zi'}
-                            data-pinyin={token.pinyin}
-                            key={tokenIndex}
-                          >
-                            {token.char}
-                          </span>
-                        ) : (
-                          token.char
-                        ),
+                      {showPinyin ? (
+                        <AnnotatedLine line={line} first={lineIndex === 0} />
+                      ) : (
+                        line.map((token) => token.char)
                       )}
                     </p>
                   ))
