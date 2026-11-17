@@ -8,13 +8,19 @@ import { useAppData } from '../hooks/useAppData'
 import { formatDateTime } from '../lib/date'
 import { getStats } from '../lib/stats'
 import { useSpeech } from '../hooks/useSpeech'
-import { defaultVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
-import { actions, exportData, parseImport, type ThemeMode } from '../lib/store'
+import { chineseVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
+import { actions, exportData, parseImport, type SpeechTimbre, type ThemeMode } from '../lib/store'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
   { value: 'light', label: '浅色' },
   { value: 'dark', label: '深色' },
+]
+
+const timbreOptions: { value: SpeechTimbre; label: string }[] = [
+  { value: 'low', label: '低沉' },
+  { value: 'normal', label: '默认' },
+  { value: 'bright', label: '明亮' },
 ]
 
 /** 试听用的短句，含多音字，顺便能听出读音校正是否生效 */
@@ -28,7 +34,6 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const speech = useSpeech()
   const [voices, setVoices] = useState<VoiceOption[]>([])
-  const [showAllVoices, setShowAllVoices] = useState(false)
 
   // 音色列表要等原生插件就绪，进页面后异步读一次
   useEffect(() => {
@@ -40,6 +45,11 @@ export function SettingsPage() {
       alive = false
     }
   }, [])
+  const chineseVoices = chineseVoiceOptions(voices)
+  // 旧版本可能存了外语音色，换设备后 URI 也可能失效，列表里没有就按跟随系统处理
+  const selectedVoiceURI = chineseVoices.some((voice) => voice.uri === data.settings.speechVoiceURI)
+    ? data.settings.speechVoiceURI
+    : null
   const [pending, setPending] = useState<ReturnType<typeof parseImport> | null>(null)
 
   const download = () => {
@@ -160,24 +170,37 @@ export function SettingsPage() {
             />
           </div>
           <div className="setting-block">
-            <label className="field-label" htmlFor="voice">
-              朗读音色
-              <span className="field-value">{voices.length ? `${voices.length} 个可用` : ''}</span>
-            </label>
-            <select
-              id="voice"
-              className="select"
-              value={data.settings.speechVoiceURI ?? ''}
-              onChange={(event) => actions.updateSettings({ speechVoiceURI: event.target.value || null })}
-              disabled={!voices.length}
-            >
-              <option value="">跟随系统默认</option>
-              {(showAllVoices ? voices : defaultVoiceOptions(voices)).map((voice) => (
-                <option key={voice.uri} value={voice.uri}>
-                  {voice.label}
-                </option>
-              ))}
-            </select>
+            <span className="field-label">朗读音色</span>
+            <Segmented
+              options={timbreOptions}
+              value={data.settings.speechTimbre}
+              onChange={(speechTimbre) => actions.updateSettings({ speechTimbre })}
+              ariaLabel="选择朗读音色"
+            />
+            <p className="setting-note">
+              低沉更接近男声，明亮更接近女声，通过调整音高实现。系统只提供一个中文音色时也能听出区别。
+            </p>
+            {chineseVoices.length > 1 ? (
+              <div className="voice-picker">
+                <label className="field-label" htmlFor="voice">
+                  系统音色
+                  <span className="field-value">{chineseVoices.length} 个中文</span>
+                </label>
+                <select
+                  id="voice"
+                  className="select"
+                  value={selectedVoiceURI ?? ''}
+                  onChange={(event) => actions.updateSettings({ speechVoiceURI: event.target.value || null })}
+                >
+                  <option value="">跟随系统默认</option>
+                  {chineseVoices.map((voice) => (
+                    <option key={voice.uri} value={voice.uri}>
+                      {voice.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="voice-preview">
               <button
                 type="button"
@@ -187,7 +210,7 @@ export function SettingsPage() {
                     speech.stop()
                     return
                   }
-                  speech.speak(VOICE_SAMPLE, data.settings.speechRate, data.settings.speechVoiceURI)
+                  speech.speak(VOICE_SAMPLE, data.settings.speechRate, selectedVoiceURI, data.settings.speechTimbre)
                 }}
                 disabled={!speech.supported}
                 title={speech.supported ? '试听当前音色' : '当前浏览器不支持朗读'}
@@ -198,21 +221,15 @@ export function SettingsPage() {
               <span className="muted-text">
                 {!speech.supported
                   ? '当前环境不支持朗读，音色设置不会生效。'
-                  : voices.length
-                    ? '音色由系统提供，换设备后可能需要重选。'
-                    : '正在读取系统音色…'}
+                  : voices.length === 0
+                    ? '正在读取系统音色…'
+                    : chineseVoices.length > 1
+                      ? '音色由系统提供，换设备后可能需要重选。'
+                      : chineseVoices.length === 1
+                        ? '音色由系统提供，这台设备只有这一个中文音色。'
+                        : '没有读取到中文音色，朗读会使用系统默认语音。'}
               </span>
             </div>
-            {voices.length > 0 ? (
-              <label className="voice-all">
-                <input
-                  type="checkbox"
-                  checked={showAllVoices}
-                  onChange={(event) => setShowAllVoices(event.target.checked)}
-                />
-                <span>显示全部语言（{voices.length} 个）</span>
-              </label>
-            ) : null}
           </div>
           <div className="mini-stats">
             <div>

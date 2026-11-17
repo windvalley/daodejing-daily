@@ -1,11 +1,12 @@
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { resolveVoiceIndex } from '../lib/speechVoice'
+import { resolveVoiceIndex, timbrePitch } from '../lib/speechVoice'
+import type { SpeechTimbre } from '../lib/store'
 
 interface SpeechState {
   supported: boolean
   speaking: boolean
-  speak: (text: string, rate?: number, voiceURI?: string | null) => void
+  speak: (text: string, rate?: number, voiceURI?: string | null, timbre?: SpeechTimbre) => void
   stop: () => void
 }
 
@@ -13,6 +14,7 @@ interface SpeakOptions {
   text: string
   rate: number
   voiceURI: string | null
+  timbre: SpeechTimbre
 }
 
 const isNative = () =>
@@ -20,13 +22,13 @@ const isNative = () =>
   Boolean((window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.())
 
 /** 浏览器朗读，优先挑选中文语音 */
-function speakInBrowser({ text, rate, voiceURI }: SpeakOptions, onDone: () => void): (() => void) | null {
+function speakInBrowser({ text, rate, voiceURI, timbre }: SpeakOptions, onDone: () => void): (() => void) | null {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'zh-CN'
   utterance.rate = rate
-  utterance.pitch = 0.95
+  utterance.pitch = timbrePitch(timbre)
   // 浏览器的 voiceURI 与原生音色列表不一定同名，先按 URI 精确匹配，
   // 再按包含关系匹配，都没有就用第一个中文音色
   const voices = window.speechSynthesis.getVoices()
@@ -64,7 +66,7 @@ export function useSpeech(): SpeechState {
   }, [native])
 
   const speak = useCallback(
-    (text: string, rate = 0.9, voiceURI: string | null = null) => {
+    (text: string, rate = 0.9, voiceURI: string | null = null, timbre: SpeechTimbre = 'normal') => {
       if (!supported || !text.trim()) return
       stop()
       setSpeaking(true)
@@ -80,7 +82,7 @@ export function useSpeech(): SpeechState {
             text,
             lang: 'zh-CN',
             rate,
-            pitch: 1,
+            pitch: timbrePitch(timbre),
             category: 'playback',
             ...(voiceIndex === undefined ? {} : { voice: voiceIndex }),
           })
@@ -96,7 +98,7 @@ export function useSpeech(): SpeechState {
         return
       }
 
-      stopRef.current = speakInBrowser({ text, rate, voiceURI }, done)
+      stopRef.current = speakInBrowser({ text, rate, voiceURI, timbre }, done)
       if (!stopRef.current) done()
     },
     [native, supported, stop],

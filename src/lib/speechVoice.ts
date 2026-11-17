@@ -1,15 +1,17 @@
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
+import type { SpeechTimbre } from './store'
 
 /**
  * 朗读音色。
  *
- * 系统 TTS 不提供音色的性别信息，Google 引擎里几个普通话音色的显示名甚至完全相同
- * （都叫 “Chinese China”），靠推断性别选音色在不同手机上会失效：
- * 没有 Google 那几个音色的设备上，男声女声会退回同一个音色，听起来毫无区别。
+ * 系统 TTS 不提供音色的性别信息，不少手机甚至只有一个中文音色，
+ * 只列系统音色时「换一个音色」往往没有任何听感变化。
+ * 所以音色分两层：
+ *   - 低沉、明亮用音高实现，不依赖系统提供几个音色；
+ *   - 系统音色只在设备确实有多个中文音色时才让用户挑。
  *
- * 所以这里不做性别判断，改成把设备支持的音色全部列出来由用户自己选，
- * 选中结果存 voiceURI。朗读时再按 URI 查当前索引，因为原生侧按音色名排序，
- * 索引不保证跨设备稳定。
+ * 系统音色的选中结果存 voiceURI。朗读时再按 URI 查当前索引，
+ * 因为原生侧按音色名排序，索引不保证跨设备稳定。
  */
 export interface VoiceEntry {
   voiceURI?: string
@@ -33,8 +35,20 @@ export interface VoiceOption {
   mandarin: boolean
 }
 
-/** 普通话：cmn-cn 前缀，或 zh-CN 标签 */
-const MANDARIN = /^(cmn-cn|zh[-_]CN)/i
+/** 三档音色对应的音高倍数。0.7 约降六个半音，听感明显更低 */
+export const TIMBRE_PITCH: Record<SpeechTimbre, number> = {
+  low: 0.7,
+  normal: 1,
+  bright: 1.25,
+}
+
+/** 取音高倍数；旧数据或非法值按系统原声处理 */
+export function timbrePitch(timbre: SpeechTimbre | null | undefined): number {
+  return TIMBRE_PITCH[timbre ?? 'normal'] ?? TIMBRE_PITCH.normal
+}
+
+/** 普通话：cmn-cn 前缀，或简体中文标签（真机上常见 zh-Hans） */
+const MANDARIN = /^(cmn-cn|zh[-_](CN|Hans))/i
 /** 中文大类，含粤语与台湾国语 */
 const CHINESE = /^(zh|cmn|yue)/i
 
@@ -71,10 +85,8 @@ export function toVoiceOptions(voices: VoiceEntry[]): VoiceOption[] {
   })
 }
 
-/** 默认展示的选项：普通话音色；没有普通话时退回全部中文音色 */
-export function defaultVoiceOptions(options: VoiceOption[]): VoiceOption[] {
-  const mandarin = options.filter((item) => item.mandarin)
-  if (mandarin.length) return mandarin
+/** 中文音色。朗读内容是中文，外语音色选了也读不对，不进入列表 */
+export function chineseVoiceOptions(options: VoiceOption[]): VoiceOption[] {
   return options.filter((item) => item.chinese)
 }
 
@@ -93,13 +105,20 @@ export async function loadVoiceOptions(): Promise<VoiceOption[]> {
   }
 }
 
-/** 按 URI 找音色索引；找不到返回 undefined，调用方应退回引擎默认音色 */
+/** 在音色列表里按 URI 找中文音色的索引；非中文与找不到都返回 undefined */
+export function findVoiceIndex(voices: VoiceEntry[], voiceURI: string | null): number | undefined {
+  if (!voiceURI) return undefined
+  const index = voices.findIndex(
+    (voice) => voice.voiceURI === voiceURI && CHINESE.test(voice.lang || voice.voiceURI || ''),
+  )
+  return index >= 0 ? index : undefined
+}
+
+/** 按 URI 找中文音色索引；找不到返回 undefined，调用方应退回引擎默认音色 */
 export async function resolveVoiceIndex(voiceURI: string | null): Promise<number | undefined> {
   if (!voiceURI) return undefined
   if (!cachedVoices) await loadVoiceOptions()
-  const voices = cachedVoices ?? []
-  const index = voices.findIndex((voice) => voice.voiceURI === voiceURI)
-  return index >= 0 ? index : undefined
+  return findVoiceIndex(cachedVoices ?? [], voiceURI)
 }
 
 /** 已选音色在当前设备上是否可用，用于提示用户换设备后重选 */

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { defaultVoiceOptions, resetVoiceCache, toVoiceOptions, type VoiceEntry } from './speechVoice'
+import {
+  chineseVoiceOptions,
+  findVoiceIndex,
+  resetVoiceCache,
+  timbrePitch,
+  toVoiceOptions,
+  type VoiceEntry,
+} from './speechVoice'
 
 /** 与 Pixel 7 / Android 16 / Google TTS 返回结构一致 */
 const pixelVoices: VoiceEntry[] = [
@@ -53,14 +60,21 @@ describe('朗读音色列表', () => {
     expect(toVoiceOptions(duplicated)).toHaveLength(pixelVoices.length)
   })
 
-  it('单音色设备也能列出可用音色，不再出现男女声共用同一条目', () => {
+  it('单音色设备的中文列表只剩一个，不会再出现同名选项', () => {
     const options = toVoiceOptions(singleVoicePhone)
-    expect(options).toHaveLength(2)
-    expect(options[0].uri).toBe('zh-CN-language')
-    // 旧实现的症状：不同性别设置解析到同一个索引。
-    // 新实现直接列音色，不存在「两个选项指向同一音色」的可能。
-    const uris = options.map((item) => item.uri)
-    expect(new Set(uris).size).toBe(uris.length)
+    const chinese = chineseVoiceOptions(options)
+    expect(chinese).toHaveLength(1)
+    expect(chinese[0].uri).toBe('zh-CN-language')
+  })
+
+  it('识别真机返回的 zh-Hans 音色', () => {
+    const options = toVoiceOptions([
+      { voiceURI: 'zh-Hans-language', name: 'Chinese China', lang: 'zh-Hans', localService: true },
+      { voiceURI: 'en-language', name: 'English', lang: 'en', localService: true },
+    ])
+    expect(options[0].mandarin).toBe(true)
+    expect(options[0].label).toBe('zh-Hans · 本地')
+    expect(chineseVoiceOptions(options)).toHaveLength(1)
   })
 
   it('缺字段的音色被跳过，不会产生空选项', () => {
@@ -70,38 +84,57 @@ describe('朗读音色列表', () => {
     expect(options[0].uri).toBe('ok')
   })
 
-  it('默认只列普通话音色，避免几百个外语音色淹没选项', () => {
-    const options = toVoiceOptions(pixelVoices)
-    const defaults = defaultVoiceOptions(options)
-    expect(defaults).toHaveLength(4)
-    expect(defaults.every((item) => item.mandarin)).toBe(true)
-    // 英文、日文不出现在默认列表里
-    expect(defaults.some((item) => item.lang === 'en-US')).toBe(false)
+  it('中文列表不含外语音色，避免选了也读不对', () => {
+    const chinese = chineseVoiceOptions(toVoiceOptions(pixelVoices))
+    expect(chinese).toHaveLength(4)
+    expect(chinese.every((item) => item.chinese)).toBe(true)
+    expect(chinese.some((item) => item.lang === 'en-US')).toBe(false)
   })
 
-  it('粤语与台湾国语不算默认普通话', () => {
+  it('粤语与台湾国语算中文音色，但普通话仍排在最前', () => {
     const options = toVoiceOptions([
       { voiceURI: 'cmn-cn-x-ccc-local', lang: 'zh-CN', localService: true },
       { voiceURI: 'cmn-tw-x-ctc-local', lang: 'zh-TW', localService: true },
       { voiceURI: 'yue-hk-x-jar-local', lang: 'yue-HK', localService: true },
     ])
-    const defaults = defaultVoiceOptions(options)
-    expect(defaults).toHaveLength(1)
-    expect(defaults[0].uri).toBe('cmn-cn-x-ccc-local')
+    expect(chineseVoiceOptions(options)).toHaveLength(3)
+    expect(options.filter((item) => item.mandarin)).toHaveLength(1)
+    expect(options[0].uri).toBe('cmn-cn-x-ccc-local')
   })
 
-  it('没有普通话音色时退回全部中文，仍不是几百个外语', () => {
+  it('只有粤语时仍可作为中文音色朗读', () => {
     const options = toVoiceOptions([
       { voiceURI: 'yue-hk-x-jar-local', lang: 'yue-HK', localService: true },
       { voiceURI: 'en-us-x-iob-local', lang: 'en-US', localService: true },
     ])
-    const defaults = defaultVoiceOptions(options)
-    expect(defaults).toHaveLength(1)
-    expect(defaults[0].uri).toBe('yue-hk-x-jar-local')
+    expect(chineseVoiceOptions(options)).toHaveLength(1)
+    expect(chineseVoiceOptions(options)[0].uri).toBe('yue-hk-x-jar-local')
+  })
+
+  it('按 URI 选中文音色，外语音色不参与', () => {
+    expect(findVoiceIndex(pixelVoices, 'cmn-cn-x-cce-local')).toBe(2)
+    expect(findVoiceIndex(pixelVoices, 'en-us-x-iob-local')).toBeUndefined()
+    expect(findVoiceIndex(pixelVoices, 'missing')).toBeUndefined()
+    expect(findVoiceIndex(pixelVoices, null)).toBeUndefined()
   })
 
   it('缓存可重置', () => {
     resetVoiceCache()
     expect(true).toBe(true)
+  })
+})
+
+describe('音色三档', () => {
+  it('低沉、默认、明亮依次提高音高，同一系统音色也能听出区别', () => {
+    expect(timbrePitch('low')).toBe(0.7)
+    expect(timbrePitch('normal')).toBe(1)
+    expect(timbrePitch('bright')).toBe(1.25)
+    expect(timbrePitch('low')).toBeLessThan(timbrePitch('normal'))
+    expect(timbrePitch('normal')).toBeLessThan(timbrePitch('bright'))
+  })
+
+  it('旧数据缺音色字段时按系统原声处理', () => {
+    expect(timbrePitch(undefined)).toBe(1)
+    expect(timbrePitch(null)).toBe(1)
   })
 })

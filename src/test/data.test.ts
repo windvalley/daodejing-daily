@@ -189,6 +189,16 @@ describe('store', () => {
     expect(getSnapshot().settings.speechVoiceURI).toBeNull()
   })
 
+  it('朗读音色三档默认系统原声，非法值退回默认', () => {
+    expect(getSnapshot().settings.speechTimbre).toBe('normal')
+    actions.updateSettings({ speechTimbre: 'low' })
+    expect(getSnapshot().settings.speechTimbre).toBe('low')
+    actions.updateSettings({ speechTimbre: 'bright' })
+    expect(getSnapshot().settings.speechTimbre).toBe('bright')
+    actions.updateSettings({ speechTimbre: 'robot' as never })
+    expect(getSnapshot().settings.speechTimbre).toBe('normal')
+  })
+
   it('设置写入后会被规范化', () => {
     actions.updateSettings({ fontSize: 100, dailyReviewGoal: -3, theme: 'dark' })
     const settings = getSnapshot().settings

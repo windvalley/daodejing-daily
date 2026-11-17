@@ -4,7 +4,7 @@
 
 ## 一、安卓 APK
 
-构建产物位于 `android/app/build/outputs/apk/release/app-release.apk`，已导出为 `release/道德经日课-1.3.apk`，直接用数据线或聊天软件传到手机，点击安装即可。
+构建产物位于 `android/app/build/outputs/apk/release/app-release.apk`，已导出为 `release/道德经日课-1.3.1.apk`，直接用数据线或聊天软件传到手机，点击安装即可。
 
 首次安装需要在系统里允许「安装未知来源应用」。这个 APK 用自签名证书签名，不是从应用商店下载，所以系统会提示风险，属于正常现象。
 
@@ -58,7 +58,8 @@ adb shell am start -n com.daodejing.daily/.MainActivity
 
 1. 进入任意章节，点「朗读」，按钮应变成「停止」，读完自动变回「朗读」。
 2. 朗读期间再点一次「停止」，应立刻停下并恢复按钮。
-3. 看日志确认请求确实交给了系统语音引擎：
+3. 在设置里把朗读音色切到「低沉」「明亮」再试听，同一系统音色下应能听出音高差异。
+4. 看日志确认请求确实交给了系统语音引擎：
 
 ```bash
 adb logcat -s GoogleTTSServiceImpl:I
