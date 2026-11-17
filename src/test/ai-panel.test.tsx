@@ -247,3 +247,64 @@ describe('设置页', () => {
     expect(screen.getByLabelText('服务地址')).toHaveValue(EMPTY_AI_CONFIG.endpoint)
   })
 })
+
+describe('无障碍与滚动', () => {
+  it('关闭时面板不可聚焦，打开后焦点在输入框', async () => {
+    saveAiConfig(config)
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    expect(dialog).not.toHaveAttribute('inert')
+    expect(within(dialog).getByRole('textbox', { name: '你的问题' })).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(dialog).toHaveAttribute('inert'))
+    expect(dialog).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('打开时锁住背后页面的滚动，关闭后恢复', async () => {
+    saveAiConfig(config)
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+    expect(document.body.style.overflow).toBe('hidden')
+
+    await user.click(within(dialog).getByRole('button', { name: '关闭问道' }))
+    await waitFor(() => expect(document.body.style.overflow).toBe(''))
+  })
+})
+
+describe('翻章后的会话边界', () => {
+  it('在应用内翻到另一章会清空上一章的对话，不漏带旧材料', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '第八章的回答。' })
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+
+    let dialog = await openPanel(user)
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '第八章的问题')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+    await within(dialog).findByText('第八章的回答。')
+
+    // 关掉面板、用章页底部的翻页链接走进下一章，App 不卸载，只有路由变化
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-hidden', 'true'))
+    await user.click(screen.getByRole('link', { name: /下一章/ }))
+
+    dialog = await openPanel(user)
+    expect(within(dialog).getByText('正在读第9章 · 运夷')).toBeInTheDocument()
+    expect(within(dialog).queryByText('第八章的问题')).toBeNull()
+    expect(within(dialog).queryByText('第八章的回答。')).toBeNull()
+
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '第九章的回答。' })
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '第九章的问题')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+    await within(dialog).findByText('第九章的回答。')
+
+    const sent = aiMocks.requestChat.mock.calls[1][0] as { role: string; content: string }[]
+    // system + 本次提问，没有第八章的历史
+    expect(sent).toHaveLength(2)
+    expect(sent[1].content).toContain('【当前位置】第9章')
+  })
+})
