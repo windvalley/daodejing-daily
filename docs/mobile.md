@@ -29,13 +29,14 @@ iOS 无法像安卓那样直接装自签名安装包，需要 Apple 开发者账
 ## 四、真机模拟器测试
 
 本机已配好两个可直接跑的安卓模拟器，用来验证边到边布局、主题切换、完整学习流程与朗读。
+仓库里没有 iOS 原生工程（`ios/` 目录与 `@capacitor/ios` 都没有装），模拟器只有安卓一侧。
 
 - `ddj-phone` 用 `default` 镜像，启动快，适合看布局和流程，但没有语音引擎。
 - `ddj-phone-tts` 用 `google_apis` 镜像，自带 Google 语音引擎，验证朗读必须用它。
 
 环境：
 
-- JDK 21 在 `~/.local/jdk/jdk-21.0.13+9/Contents/Home`
+- JDK 21 在 `~/.local/jdk/` 下的某个 `jdk-21.*/Contents/Home`，不要把小版本号写死到命令里
 - Android SDK 在 `~/.local/android-sdk`（platform 36、build-tools 36、emulator、系统镜像 `android-36;default;arm64-v8a` 与 `android-36;google_apis;arm64-v8a`）
 - 两个 AVD 都是 Pixel 7 规格，分辨率 1080x2400，密度 420
 
@@ -46,13 +47,34 @@ iOS 无法像安卓那样直接装自签名安装包，需要 Apple 开发者账
 
 ```bash
 export ANDROID_HOME=$HOME/.local/android-sdk
-export PATH="$HOME/.local/jdk/jdk-21.0.13+9/Contents/Home/bin:$ANDROID_HOME/platform-tools:$PATH"
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
 
 $ANDROID_HOME/emulator/emulator -avd ddj-phone-tts -no-snapshot -no-boot-anim -gpu swiftshader_indirect -no-audio &
 adb wait-for-device
 adb install -r android/app/build/outputs/apk/release/app-release.apk
 adb shell am start -n com.daodejing.daily/.MainActivity
 ```
+
+模拟器与 adb 都是原生可执行文件，启动这一步不需要 JDK。
+只有打 APK 才需要 JDK 21，`scripts/build-apk.sh` 会自己在 `~/.local/jdk/` 下找，不必手工导出 `JAVA_HOME`。
+
+### 改样式时不必每次打 APK
+
+APK 里加载的是打包进去的 `dist`，改源码不会自动生效。只想看页面渲染时，让电脑上的开发服务器直接对模拟器开放：
+
+```bash
+pnpm dev
+adb shell am start -a android.intent.action.VIEW -d "http://10.0.2.2:5173/"
+```
+
+`10.0.2.2` 是模拟器指向宿主机回环地址的固定别名，等价于宿主机的 `127.0.0.1`。
+所以 `pnpm dev` 不带 `--host` 也能被模拟器访问，不需要换成 `pnpm dev:lan`，也不用去查局域网 IP。
+模拟器内置 Chrome 首次打开会有几步引导（登录、通知），点「Use without an account」和「No thanks」跳过后就能看到页面。
+端口按 Vite 默认的 5173 算，本机 5173 被占用时 Vite 会顺延到下一个端口，地址里要改成实际打印的那个。
+
+这条路只能验证网页本身：页面跑在 Chrome 里，不是 Capacitor，所以既没有 Capacitor 注入的 `--safe-area-inset-*`，也没有状态栏配色、原生导出插件与朗读插件。
+`--safe-top` 这类变量在浏览器里只剩 `env(safe-area-inset-*)` 一项来源，避让结果和装成 APK 后不一致。
+边到边布局、状态栏条带底色、导出落盘、朗读仍然必须装 APK 在 `ddj-phone-tts` 上验。
 
 ### 验证朗读
 
