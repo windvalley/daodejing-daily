@@ -457,7 +457,7 @@ describe('联网搜索开关', () => {
     await within(dialog).findByText('好。')
 
     const messages = aiMocks.requestChat.mock.calls[0][0] as { content: string }[]
-    expect(messages[0].content).toContain('你可以调用联网搜索')
+    expect(messages[0].content).toContain('默认就该用')
     expect(messages[0].content).toContain('必须与本书分开说明')
     expect(messages[0].content).not.toContain('你没有联网与检索能力')
   })

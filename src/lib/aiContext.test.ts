@@ -257,6 +257,25 @@ describe('联网规则', () => {
     expect(AI_WEB_RULES).toContain('以本书材料为准')
   })
 
+  it('把检索写成缺省动作，不是「可以使用」', () => {
+    // 真机上写成许可时，模型看到材料有点相关就停手，还主动说「材料只说到这一层」却不去搜
+    expect(AI_WEB_RULES).toContain('默认就该用')
+    expect(AI_WEB_RULES).not.toContain('你可以调用联网搜索')
+    expect(AI_WEB_RULES).toContain('先搜再答')
+  })
+
+  it('划清什么时候算材料不够，避免模型自行判定「有点相关」就停', () => {
+    for (const signal of ['字义', '出处', '异文', '注家分歧', '读音', '典故', '史实', '后世用法']) {
+      expect(AI_WEB_RULES).toContain(signal)
+    }
+    expect(AI_WEB_RULES).toContain('不要因为材料里「有点相关」就停下')
+  })
+
+  it('要求检索后没有可靠答案就说没查到，不用印象补足', () => {
+    expect(AI_WEB_RULES).toContain('没有可靠答案')
+    expect(AI_WEB_RULES).toContain('不要用印象补足')
+  })
+
   it('两套规则互斥，不会同时出现', () => {
     for (const webSearch of [true, false]) {
       const prompt = buildSystemPrompt({ webSearch })
