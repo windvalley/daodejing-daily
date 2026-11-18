@@ -27,7 +27,6 @@ export type IconName =
   | 'refresh'
   | 'eye'
   | 'info'
-  | 'chat'
 
 const paths: Record<IconName, React.ReactNode> = {
   today: (
@@ -155,12 +154,6 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 16v-4M12 8h.01" />
-    </>
-  ),
-  chat: (
-    <>
-      <path d="M21 12a8 8 0 0 1-8 8H8l-4 3v-7.5A8 8 0 0 1 12 4h1a8 8 0 0 1 8 8z" />
-      <path d="M9 11h.01M13 11h.01M17 11h.01" />
     </>
   ),
 }

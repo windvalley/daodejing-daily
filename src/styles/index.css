@@ -3922,49 +3922,116 @@ input[type='range'] {
 /* ── 问道（AI 助手） ─────────────────────────────────────────── */
 
 /*
- * 入口有两个：宽屏在侧栏，窄屏在底栏上方的浮动按钮。
- * 两者共用同一份面板，面板本身是抽屉（宽屏从右侧滑出、窄屏从底部升起）。
+ * 唯一入口：所有断点共用一个右下角悬浮球。
+ * 之前宽屏在侧栏、窄屏在底栏上方，两条链路改一处容易漏另一处。
+ * 收起时只有一个「问」，展开时补上「道」，读起来是「问道」；
+ * 两个字从不同时出现，快速划过也不会看到重影。
+ * 展开看设备能力而不是视口宽度：平板接蓝牙鼠标、窄窗口里接键盘，同样需要这行提示。
  */
-.ai-entry {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--ink-2);
-  font-size: 14px;
-  text-align: left;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
-}
-
-.ai-entry:hover {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-.ai-fab {
+.ai-launcher {
   position: fixed;
   right: calc(14px + var(--safe-right));
-  bottom: calc(72px + var(--safe-bottom));
+  /* 窄屏底栏高 72，留 6 像素空隙，免得和「实践」贴在一起 */
+  bottom: calc(78px + var(--safe-bottom));
   z-index: 45;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 两个汉字之间不加间隙：收起时那个字会被 max-width: 0 收掉，居中才不会偏 */
+  gap: 0;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--line-strong);
+  border-radius: 999px;
   background: var(--surface);
   color: var(--accent-strong);
   box-shadow: var(--shadow-md);
+  transition:
+    width 180ms ease,
+    background 140ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
-.ai-fab:hover {
+.ai-launcher:hover {
   background: var(--accent-soft);
+}
+
+/* 两个字同字号同字体，展开时只多出一个字，字重与基线不会跳 */
+.ai-launcher-seal,
+.ai-launcher-label {
+  flex: none;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ai-launcher-label {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-width 180ms ease,
+    opacity 140ms ease;
+}
+
+/*
+ * 滚动时收起，避免固定球压住列表最右列与章页底部的按钮。
+ * 用 visibility 而不是只改透明度：透明按钮仍然会被 Tab 选中，也还在无障碍树里。
+ */
+.ai-launcher.is-hidden {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(10px) scale(0.94);
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 0s linear 180ms;
+}
+
+/* 触屏没有真正的悬停，展开只对鼠标设备开放 */
+@media (hover: hover) {
+  .ai-launcher:hover {
+    width: 80px;
+  }
+
+  .ai-launcher:hover .ai-launcher-label {
+    max-width: 1.2em;
+    opacity: 1;
+  }
+}
+
+/* 键盘聚焦在任何宽度都展开，窄屏接键盘时同样要能看清这是「问道」 */
+.ai-launcher:focus-visible {
+  width: 80px;
+}
+
+.ai-launcher:focus-visible .ai-launcher-label {
+  max-width: 1.2em;
+  opacity: 1;
+}
+
+@media (min-width: 1024px) {
+  /*
+   * 宽屏没有底栏，落回常规边距。
+   * 16 像素让球顶正好落在正文底部内边距（64 像素）处，滚到底也不会压住分页卡。
+   */
+  .ai-launcher {
+    bottom: calc(16px + var(--safe-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-launcher,
+  .ai-launcher.is-hidden,
+  .ai-launcher-label {
+    transition: none;
+  }
 }
 
 .ai-scrim {
@@ -4002,7 +4069,7 @@ input[type='range'] {
 }
 
 @media (max-width: 1023px) {
-  /* 悬浮按钮占距底边 72 到 118 像素的一条，内容区原有 96 像素不够，滚到底时文字会被压住 */
+  /* 悬浮球占距底边 78 到 126 像素的一条，内容区原有 96 像素不够，滚到底时文字会被压住 */
   .content {
     padding-bottom: calc(132px + var(--safe-bottom));
   }
@@ -4292,11 +4359,6 @@ input[type='range'] {
 
 /* 宽屏从右侧滑出，窄屏的规则在上面，两条不能合并 */
 @media (min-width: 1024px) {
-  /* 宽屏走侧栏入口，浮动按钮没有存在的必要 */
-  .ai-fab {
-    display: none;
-  }
-
   .ai-panel {
     inset: 0 0 0 auto;
     width: 400px;
@@ -4317,7 +4379,7 @@ input[type='range'] {
   .chapter-actions,
   .reading-aside,
   .toast-stack,
-  .ai-fab,
+  .ai-launcher,
   .ai-panel,
   .ai-scrim,
   .skip-link {

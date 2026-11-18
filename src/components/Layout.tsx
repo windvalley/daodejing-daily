@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAppData } from '../hooks/useAppData'
 import { useNow } from '../hooks/useNow'
 import { focusFromPath } from '../lib/aiContext'
 import { getStats } from '../lib/stats'
+import { AiLauncher } from './AiLauncher'
 import { AiPanel } from './AiPanel'
 import { Icon, type IconName } from './Icon'
 
@@ -44,6 +45,18 @@ export function Layout() {
   // 问道只需要知道读者停在哪一章，路由是唯一的来源，不额外维护状态
   const focus = focusFromPath(location.pathname)
   const [aiOpen, setAiOpen] = useState(false)
+  const launcherRef = useRef<HTMLButtonElement>(null)
+
+  /*
+   * 收起面板时把焦点还给入口。
+   * 面板里的链接会换到别的页面，此时链接所在的面板已经 inert，
+   * 不再把焦点拉回悬浮球，交给新页面按常规处理。
+   */
+  const closeAi = useCallback(() => {
+    setAiOpen(false)
+    launcherRef.current?.focus({ preventScroll: true })
+  }, [])
+  const navigateFromAi = useCallback(() => setAiOpen(false), [])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -88,10 +101,6 @@ export function Layout() {
               <div className="progress-fill" style={{ width: `${(stats.read / stats.total) * 100}%` }} />
             </div>
           </div>
-          <button type="button" className="ai-entry" onClick={() => setAiOpen(true)}>
-            <Icon name="chat" size={18} />
-            <span className="nav-label">问道</span>
-          </button>
           <p className="sidebar-quote">千里之行，始于足下。</p>
         </div>
       </aside>
@@ -123,13 +132,15 @@ export function Layout() {
           </div>
         </header>
 
+        {/*
+         * 入口是 fixed 定位，放在 main 之前只影响 Tab 顺序：
+         * 键盘读者从页首过来不必先穿过正文里的二十多个控件才能到它。
+         */}
+        <AiLauncher open={aiOpen} onOpen={() => setAiOpen(true)} buttonRef={launcherRef} />
+
         <main className="content" id="main-content">
           <Outlet />
         </main>
-
-        <button type="button" className="ai-fab" onClick={() => setAiOpen(true)} aria-label="打开问道">
-          <Icon name="chat" size={20} />
-        </button>
 
         <nav className="bottom-nav" aria-label="底部导航">
           {bottomNav.map((item) => (
@@ -144,7 +155,7 @@ export function Layout() {
         </nav>
       </div>
 
-      <AiPanel open={aiOpen} onClose={() => setAiOpen(false)} focus={focus} />
+      <AiPanel open={aiOpen} onClose={closeAi} onNavigate={navigateFromAi} focus={focus} />
     </div>
   )
 }
