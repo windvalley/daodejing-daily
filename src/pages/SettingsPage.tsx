@@ -341,7 +341,7 @@ export function SettingsPage() {
             <h2>问道（AI 助手）</h2>
           </div>
           <p className="setting-copy">
-            填一个兼容 OpenAI 接口的模型服务，就能在首页与章节页右下角打开「问道」，就当前这一章提问。
+            填一个兼容 OpenAI 接口的模型服务，就能在每一页右下角打开「问道」，就当前这一章提问。
             不填也不影响阅读、背诵与复习。
           </p>
           <div className="setting-block">

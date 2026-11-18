@@ -3922,49 +3922,111 @@ input[type='range'] {
 /* ── 问道（AI 助手） ─────────────────────────────────────────── */
 
 /*
- * 入口有两个：宽屏在侧栏，窄屏在底栏上方的浮动按钮。
- * 两者共用同一份面板，面板本身是抽屉（宽屏从右侧滑出、窄屏从底部升起）。
+ * 唯一入口：所有断点共用一个右下角悬浮球。
+ * 之前宽屏在侧栏、窄屏在底栏上方，两条链路改一处容易漏另一处。
+ * 鼠标设备上悬停或聚焦时展开「问道」二字：只有一个「问」字，新读者不容易看出这是对话。
  */
-.ai-entry {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--ink-2);
-  font-size: 14px;
-  text-align: left;
-  transition:
-    background 140ms ease,
-    color 140ms ease;
-}
-
-.ai-entry:hover {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-.ai-fab {
+.ai-launcher {
   position: fixed;
   right: calc(14px + var(--safe-right));
-  bottom: calc(72px + var(--safe-bottom));
+  /* 窄屏底栏高 72，留 6 像素空隙，免得和「实践」贴在一起 */
+  bottom: calc(78px + var(--safe-bottom));
   z-index: 45;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--line-strong);
+  border-radius: 999px;
   background: var(--surface);
   color: var(--accent-strong);
   box-shadow: var(--shadow-md);
+  transition:
+    width 180ms ease,
+    background 140ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
-.ai-fab:hover {
+.ai-launcher:hover {
   background: var(--accent-soft);
+}
+
+.ai-launcher-seal {
+  flex: none;
+  max-width: 2em;
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 1;
+  transition:
+    max-width 180ms ease,
+    opacity 120ms ease;
+}
+
+.ai-launcher-label {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  transition:
+    max-width 180ms ease,
+    opacity 120ms ease;
+}
+
+/*
+ * 滚动时收起，避免固定球压住列表最右列与章页底部的按钮。
+ * 用 visibility 而不是只改透明度：透明按钮仍然会被 Tab 选中，也还在无障碍树里。
+ */
+.ai-launcher.is-hidden {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(10px) scale(0.94);
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 0s linear 180ms;
+}
+
+@media (min-width: 1024px) {
+  /* 宽屏没有底栏，落回常规边距 */
+  .ai-launcher {
+    bottom: calc(24px + var(--safe-bottom));
+  }
+
+  .ai-launcher:hover,
+  .ai-launcher:focus-visible {
+    width: 96px;
+  }
+
+  /* 展开时换成「问道」二字，不保留印章里的「问」，否则读起来是「问问道」 */
+  .ai-launcher:hover .ai-launcher-seal,
+  .ai-launcher:focus-visible .ai-launcher-seal {
+    max-width: 0;
+    opacity: 0;
+  }
+
+  .ai-launcher:hover .ai-launcher-label,
+  .ai-launcher:focus-visible .ai-launcher-label {
+    max-width: 2.6em;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-launcher,
+  .ai-launcher.is-hidden,
+  .ai-launcher-label {
+    transition: none;
+  }
 }
 
 .ai-scrim {
@@ -4292,11 +4354,6 @@ input[type='range'] {
 
 /* 宽屏从右侧滑出，窄屏的规则在上面，两条不能合并 */
 @media (min-width: 1024px) {
-  /* 宽屏走侧栏入口，浮动按钮没有存在的必要 */
-  .ai-fab {
-    display: none;
-  }
-
   .ai-panel {
     inset: 0 0 0 auto;
     width: 400px;
@@ -4317,7 +4374,7 @@ input[type='range'] {
   .chapter-actions,
   .reading-aside,
   .toast-stack,
-  .ai-fab,
+  .ai-launcher,
   .ai-panel,
   .ai-scrim,
   .skip-link {

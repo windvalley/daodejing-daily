@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -34,7 +34,7 @@ function renderApp(path = '/chapters/1') {
 
 /** 面板一直在 DOM 里，靠 aria-hidden 区分开关，查询统一限定在对话框内 */
 function openPanel(user: ReturnType<typeof userEvent.setup>) {
-  return user.click(screen.getByRole('button', { name: '问道' })).then(() => screen.getByRole('dialog'))
+  return user.click(screen.getByRole('button', { name: '打开问道' })).then(() => screen.getByRole('dialog'))
 }
 
 beforeEach(() => {
@@ -45,6 +45,56 @@ beforeEach(() => {
 })
 
 describe('问道入口', () => {
+  it('全站只有一个入口，侧栏不再重复放一个', () => {
+    renderApp()
+
+    expect(screen.getAllByRole('button', { name: '打开问道' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: '问道' })).toBeNull()
+  })
+
+  it('滚动时收起，停下后重新出现', () => {
+    vi.useFakeTimers()
+    const originalY = window.scrollY
+    try {
+      renderApp()
+      const launcher = screen.getByRole('button', { name: '打开问道' })
+      expect(launcher).not.toHaveClass('is-hidden')
+
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: originalY + 400 })
+      fireEvent.scroll(window)
+      expect(launcher).toHaveClass('is-hidden')
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(launcher).not.toHaveClass('is-hidden')
+    } finally {
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: originalY })
+      vi.useRealTimers()
+    }
+  })
+
+  it('焦点落在入口上时不再收起，键盘读者不会停在隐藏按钮上', () => {
+    const originalY = window.scrollY
+    try {
+      renderApp()
+      const launcher = screen.getByRole('button', { name: '打开问道' })
+
+      // Tab 走到入口时浏览器会把它滚进视口，这次滚动也会触发隐藏
+      act(() => launcher.focus())
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: originalY + 600 })
+      fireEvent.scroll(window)
+      expect(launcher).not.toHaveClass('is-hidden')
+
+      act(() => launcher.blur())
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: originalY + 1200 })
+      fireEvent.scroll(window)
+      expect(launcher).toHaveClass('is-hidden')
+    } finally {
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: originalY })
+    }
+  })
+
   it('未配置时点开是引导，不出现输入框', async () => {
     const user = userEvent.setup()
     renderApp()
@@ -264,6 +314,8 @@ describe('无障碍与滚动', () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(dialog).toHaveAttribute('inert'))
     expect(dialog).toHaveAttribute('aria-hidden', 'true')
+    // 收起后焦点回到入口，键盘读者不会掉回页首
+    expect(screen.getByRole('button', { name: '打开问道' })).toHaveFocus()
   })
 
   it('打开时锁住背后页面的滚动，关闭后恢复', async () => {

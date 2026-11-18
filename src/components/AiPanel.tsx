@@ -45,7 +45,18 @@ function focusKey(focus: AiFocus): string {
   return 'none'
 }
 
-export function AiPanel({ open, onClose, focus }: { open: boolean; onClose: () => void; focus: AiFocus }) {
+export function AiPanel({
+  open,
+  onClose,
+  onNavigate,
+  focus,
+}: {
+  open: boolean
+  onClose: () => void
+  /** 面板里的链接会切到别的页面，不把焦点拉回入口 */
+  onNavigate: () => void
+  focus: AiFocus
+}) {
   const panelRef = useRef<HTMLElement>(null)
   const titleId = useId()
 
@@ -118,7 +129,7 @@ export function AiPanel({ open, onClose, focus }: { open: boolean; onClose: () =
           </button>
         </header>
 
-        <AiSession key={focusKey(focus)} open={open} focus={focus} onClose={onClose} />
+        <AiSession key={focusKey(focus)} open={open} focus={focus} onNavigate={onNavigate} />
       </aside>
     </>
   )
@@ -195,7 +206,7 @@ function AssistantMessage({
  * 用 focusKey 作为 key 挂在父组件上：翻章就整体重挂，历史与草稿一起清空。
  * 关掉面板不改变 key，所以会话在关开之间保留，方便中途回章页核对原文。
  */
-function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; onClose: () => void }) {
+function AiSession({ open, focus, onNavigate }: { open: boolean; focus: AiFocus; onNavigate: () => void }) {
   const chat = useAiChat({ focus })
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -232,7 +243,7 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
             配置只存在这台设备上，不会跟随备份导出，也不会走任何中转服务。
           </p>
           <p className="ai-empty-note">不配置也没关系，阅读、背诵、复习与实践都不依赖它，断网时照样能用。</p>
-          <Link className="button button-primary button-small" to="/settings" onClick={onClose}>
+          <Link className="button button-primary button-small" to="/settings" onClick={onNavigate}>
             去配置
           </Link>
         </div>
@@ -279,7 +290,7 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
                     question={message.error.question}
                     focus={focus}
                     focusToken={focusToken}
-                    onNavigate={onClose}
+                    onNavigate={onNavigate}
                   />
                 ) : null}
                 <div className="ai-error-actions">
@@ -298,7 +309,7 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
                     </button>
                   ) : null}
                   {message.error.kind === 'auth' ? (
-                    <Link className="text-link" to="/settings" onClick={onClose}>
+                    <Link className="text-link" to="/settings" onClick={onNavigate}>
                       去检查配置
                     </Link>
                   ) : null}
@@ -306,7 +317,12 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
               </div>
             </div>
           ) : (
-            <AssistantMessage key={message.id} content={message.content} report={message.report} onNavigate={onClose} />
+            <AssistantMessage
+              key={message.id}
+              content={message.content}
+              report={message.report}
+              onNavigate={onNavigate}
+            />
           ),
         )}
 
