@@ -5,10 +5,13 @@ import {
   clearAiConfig,
   isAiConfigured,
   loadAiConfig,
+  contentOfSseData,
+  errorOfSseData,
   normalizeEndpoint,
   requestChat,
   sanitizeAiConfig,
   saveAiConfig,
+  splitSseEvents,
   type AiConfig,
   type ChatMessage,
 } from './ai'
@@ -269,5 +272,142 @@ describe('联网工具', () => {
     expect(EMPTY_AI_CONFIG.webSearch).toBe(false)
     expect(sanitizeAiConfig({ endpoint: 'x', model: 'y', apiKey: 'z', webSearch: true }).webSearch).toBe(true)
     expect(sanitizeAiConfig({ endpoint: 'x', model: 'y', apiKey: 'z' }).webSearch).toBe(false)
+  })
+})
+
+describe('SSE 解析', () => {
+  it('按空行切事件，半截留在 rest 里', () => {
+    const { events, rest } = splitSseEvents('data: {"a":1}\n\ndata: {"a":2}\n\ndata: {"a":3')
+    expect(events).toEqual(['{"a":1}', '{"a":2}'])
+    expect(rest).toBe('data: {"a":3')
+  })
+
+  it('兼容 CRLF 换行', () => {
+    const { events } = splitSseEvents('data: {"a":1}\r\n\r\n')
+    expect(events).toEqual(['{"a":1}'])
+  })
+
+  it('忽略非 data 行与空事件', () => {
+    const { events } = splitSseEvents(': keep-alive\n\nevent: ping\n\ndata: {"a":1}\n\n')
+    expect(events).toEqual(['{"a":1}'])
+  })
+
+  it('只取 delta.content，丢掉 reasoning_content', () => {
+    const reasoning = JSON.stringify({ choices: [{ delta: { reasoning_content: '草稿' } }] })
+    const body = JSON.stringify({ choices: [{ delta: { content: '正文' } }] })
+    expect(contentOfSseData(reasoning)).toBeNull()
+    expect(contentOfSseData(body)).toBe('正文')
+  })
+
+  it('[DONE] 与非 JSON 不产生正文', () => {
+    expect(contentOfSseData('[DONE]')).toBeNull()
+    expect(contentOfSseData('{坏掉的')).toBeNull()
+  })
+
+  it('流里的 error 块能被识别', () => {
+    expect(errorOfSseData(JSON.stringify({ error: { message: '额度不足' } }))).toBe('额度不足')
+    expect(errorOfSseData(JSON.stringify({ choices: [] }))).toBeNull()
+  })
+})
+
+describe('流式请求', () => {
+  /** 把若干字符串拼成一个可分块读取的流响应 */
+  function streamResponse(chunks: string[], contentType = 'text/event-stream'): Response {
+    const encoder = new TextEncoder()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        chunks.forEach((chunk) => controller.enqueue(encoder.encode(chunk)))
+        controller.close()
+      },
+    })
+    return { ok: true, status: 200, headers: new Headers({ 'content-type': contentType }), body } as unknown as Response
+  }
+
+  const sse = (delta: object) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`
+
+  it('逐段回调并拼出完整正文', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(streamResponse([sse({ content: '道' }), sse({ content: '可道' }), 'data: [DONE]\n\n']))
+    const deltas: string[] = []
+    const result = await requestChat(messages, config, { fetchImpl, onDelta: (t) => deltas.push(t) })
+    expect(deltas).toEqual(['道', '可道'])
+    expect(result).toEqual({ status: 'ok', content: '道可道' })
+  })
+
+  it('一个事件被拆成两次到达时也能拼回来', async () => {
+    const full = sse({ content: '上善若水' })
+    const cut = Math.floor(full.length / 2)
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(streamResponse([full.slice(0, cut), full.slice(cut), 'data: [DONE]\n\n']))
+    const result = await requestChat(messages, config, { fetchImpl, onDelta: () => {} })
+    expect(result).toEqual({ status: 'ok', content: '上善若水' })
+  })
+
+  it('请求体带上 stream 与 include_usage', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(streamResponse([sse({ content: '好' }), 'data: [DONE]\n\n']))
+    await requestChat(messages, config, { fetchImpl, onDelta: () => {} })
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body)
+    expect(body.stream).toBe(true)
+    expect(body.stream_options).toEqual({ include_usage: true })
+  })
+
+  it('不传 onDelta 时仍是整段请求', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: '整段' } }] }))
+    const result = await requestChat(messages, config, { fetchImpl })
+    expect(result).toEqual({ status: 'ok', content: '整段' })
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).stream).toBe(false)
+  })
+
+  it('网关忽略 stream 仍返回 JSON 时也能拿到正文', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: '退化成整段' } }] }))
+    const deltas: string[] = []
+    const result = await requestChat(messages, config, { fetchImpl, onDelta: (t) => deltas.push(t) })
+    expect(result).toEqual({ status: 'ok', content: '退化成整段' })
+    expect(deltas).toEqual(['退化成整段'])
+  })
+
+  it('流到一半报错时按失败返回，并带上厂商文案', async () => {
+    // 真实环境里鉴权与参数错误走 HTTP 状态码，但生成中途出错会以 data 事件下发
+    const failure = `data: ${JSON.stringify({ error: { message: '额度不足' } })}\n\n`
+    const fetchImpl = vi.fn().mockResolvedValue(streamResponse([sse({ content: '开头' }), failure]))
+    const result = await requestChat(messages, config, { fetchImpl, onDelta: () => {} })
+    expect(result).toMatchObject({ status: 'error', kind: 'network', message: '额度不足' })
+  })
+
+  it('错误行没有 data 前缀时也能认出来', async () => {
+    const failure = JSON.stringify({ error: { message: '生成中断' } }) + '\n\n'
+    const fetchImpl = vi.fn().mockResolvedValue(streamResponse([sse({ content: '开头' }), failure]))
+    const result = await requestChat(messages, config, { fetchImpl, onDelta: () => {} })
+    expect(result).toMatchObject({ status: 'error', message: '生成中断' })
+  })
+
+  it('读者中途取消时保留已收到的内容并标记为不完整', async () => {
+    const controller = new AbortController()
+    const encoder = new TextEncoder()
+    // 取消后让挂起的 read() 直接报错，模拟真实 fetch 流被 abort 的行为
+    const body = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        streamController.enqueue(encoder.encode(sse({ content: '写了一半' })))
+      },
+      pull() {
+        return new Promise<void>((_resolve, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+        })
+      },
+    })
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/event-stream' }),
+      body,
+    } as unknown as Response
+    const fetchImpl = vi.fn().mockResolvedValue(response)
+    const pending = requestChat(messages, config, { fetchImpl, signal: controller.signal, onDelta: () => {} })
+    await new Promise((r) => setTimeout(r, 20))
+    controller.abort()
+    const result = await pending
+    expect(result).toMatchObject({ content: '写了一半', partial: true })
   })
 })

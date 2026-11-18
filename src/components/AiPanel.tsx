@@ -176,16 +176,32 @@ function LocalFallback({
 function AssistantMessage({
   content,
   report,
+  streaming,
+  partial,
   onNavigate,
 }: {
   content: string
   report?: CitationReport
+  streaming?: boolean
+  partial?: boolean
   onNavigate: () => void
 }) {
   const notice = report ? citationNotice(report) : null
+  // 第一个字还没回来时显示「正在翻书」，之后让位给正在写入的正文
+  if (!content && streaming) {
+    return (
+      <div className="ai-message is-assistant">
+        <p className="ai-bubble ai-thinking">正在翻书…</p>
+      </div>
+    )
+  }
   return (
     <div className="ai-message is-assistant">
-      <p className="ai-bubble">{content}</p>
+      <p className={streaming ? 'ai-bubble is-streaming' : 'ai-bubble'}>
+        {content}
+        {streaming ? <span className="ai-caret" aria-hidden="true" /> : null}
+      </p>
+      {partial ? <p className="ai-notice">已停止生成，上面是未写完的部分。</p> : null}
       {report && report.chapters.length ? (
         <div className="ai-cites">
           <span>依据：</span>
@@ -321,16 +337,12 @@ function AiSession({ open, focus, onNavigate }: { open: boolean; focus: AiFocus;
               key={message.id}
               content={message.content}
               report={message.report}
+              streaming={message.streaming}
+              partial={message.partial}
               onNavigate={onNavigate}
             />
           ),
         )}
-
-        {chat.pending ? (
-          <div className="ai-message is-assistant">
-            <p className="ai-bubble ai-thinking">正在翻书…</p>
-          </div>
-        ) : null}
       </div>
 
       <form

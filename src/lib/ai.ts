@@ -46,7 +46,13 @@ export const AI_TIMEOUT_MS = 30_000
 export type AiErrorKind = 'not-configured' | 'offline' | 'auth' | 'quota' | 'timeout' | 'parse' | 'network'
 
 export type AiResult =
-  { status: 'ok'; content: string } | { status: 'aborted' } | { status: 'error'; kind: AiErrorKind; message: string }
+  /**
+   * partial 为真表示读者中途点了停止，content 是已经显示出来的那部分。
+   * 这种回答不完整，界面不该再对它做引用核查，否则会把截断处判成「引文有问题」。
+   */
+  | { status: 'ok'; content: string; partial?: boolean }
+  | { status: 'aborted' }
+  | { status: 'error'; kind: AiErrorKind; message: string }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -187,11 +193,72 @@ export const WEB_SEARCH_TOOL = { type: 'deepseek_web_search' } as const
 /**
  * 请求体只带最小字段，避免不同厂商忽略不认识的参数时报错。
  * tools 仅在读者主动开启联网时才带，没开时请求体与之前完全一致。
+ * stream_options 只在流式时带，用来在最后一块里拿到用量。
  */
-function buildBody(messages: ChatMessage[], model: string, webSearch = false): string {
-  const body: Record<string, unknown> = { model, messages, stream: false }
+function buildBody(messages: ChatMessage[], model: string, webSearch = false, stream = false): string {
+  const body: Record<string, unknown> = { model, messages, stream }
   if (webSearch) body.tools = [WEB_SEARCH_TOOL]
+  if (stream) body.stream_options = { include_usage: true }
   return JSON.stringify(body)
+}
+
+/**
+ * 从 SSE 缓冲区里切出完整事件，返回事件体与剩下的半截。
+ *
+ * 网络分块不按事件边界切，一个 data 行可能被拆成两次收到，
+ * 所以在凑满空行之前不能解析，否则会拿到半截 JSON。
+ */
+export function splitSseEvents(buffer: string): { events: string[]; rest: string } {
+  const normalized = buffer.replace(/\r\n/g, '\n')
+  const parts = normalized.split('\n\n')
+  const rest = parts.pop() ?? ''
+  const events: string[] = []
+  parts.forEach((block) => {
+    // 同一个事件里的多行 data 按规范用换行拼接，这里只取 data 行
+    const data = block
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n')
+    if (data) events.push(data)
+  })
+  return { events, rest }
+}
+
+/**
+ * 解析一条流事件，返回这次要追加的正文。
+ *
+ * 只取 delta.content：DeepSeek 的思考过程放在 delta.reasoning_content，
+ * 那是模型的草稿，不该出现在界面里。联网时还会有 server_tool_calls 与 annotations，
+ * 这里一律忽略，让界面只显示正文。
+ */
+export function contentOfSseData(data: string): string | null {
+  if (data === '[DONE]') return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(data)
+  } catch {
+    return null
+  }
+  if (!isRecord(parsed) || !Array.isArray(parsed.choices)) return null
+  const choice = parsed.choices[0]
+  if (!isRecord(choice) || !isRecord(choice.delta)) return null
+  const content = choice.delta.content
+  return typeof content === 'string' && content ? content : null
+}
+
+/** 流里是否有厂商报错，例如流到一半返回 {"error":{...}} */
+export function errorOfSseData(data: string): string | null {
+  if (data === '[DONE]') return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(data)
+  } catch {
+    return null
+  }
+  if (!isRecord(parsed) || !isRecord(parsed.error)) return null
+  const message = parsed.error.message
+  return typeof message === 'string' && message.trim() ? message.trim() : '生成过程中出错。'
 }
 
 function errorKindOfStatus(status: number): AiErrorKind {
@@ -223,9 +290,85 @@ function contentOf(body: unknown): string | null {
 export interface RequestOptions {
   /** 外部取消信号，例如读者点了「停止」或关闭了面板 */
   signal?: AbortSignal
+  /**
+   * 收到正文增量时回调，传了就往流式请求走。
+   * 不传则是原来的整段请求，用于兼容不支持流式的网关。
+   */
+  onDelta?: (text: string) => void
   timeoutMs?: number
   /** 测试注入用，默认 globalThis.fetch */
   fetchImpl?: typeof fetch
+}
+
+/** 读流并逐段回调，返回完整正文；流被取消时把已收到的部分一并带回去 */
+async function readStream(
+  response: Response,
+  controller: AbortController,
+  options: RequestOptions,
+  touch: () => void,
+): Promise<{ content: string; aborted: boolean; streamError: string | null }> {
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('响应没有可读的流')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let content = ''
+  let streamError: string | null = null
+
+  for (;;) {
+    let chunk: ReadableStreamReadResult<Uint8Array>
+    try {
+      chunk = await reader.read()
+    } catch (error) {
+      // 取消时 read 会抛，交给上层按 aborted 处理
+      if (controller.signal.aborted) return { content, aborted: true, streamError }
+      throw error
+    }
+    if (chunk.done) break
+    touch()
+    buffer += decoder.decode(chunk.value, { stream: true })
+
+    /*
+     * 有些网关把错误直接写成不带 data: 前缀的一行 JSON。
+     * 这种行没有 data 字段，会被事件切分当成空事件丢掉，所以先整块看一眼。
+     */
+    const bare = buffer.trim()
+    if (bare.startsWith('{')) {
+      const failure = errorOfSseData(bare)
+      if (failure) {
+        streamError = failure
+        break
+      }
+    }
+
+    const { events, rest } = splitSseEvents(buffer)
+    buffer = rest
+    for (const event of events) {
+      const failure = errorOfSseData(event)
+      if (failure) {
+        streamError = failure
+        continue
+      }
+      const text = contentOfSseData(event)
+      if (text) {
+        content += text
+        options.onDelta?.(text)
+      }
+    }
+    if (streamError) break
+  }
+
+  // 末尾可能还剩一个没被空行收尾的事件
+  const { events } = splitSseEvents(`${buffer}\n\n`)
+  for (const event of events) {
+    const text = contentOfSseData(event)
+    if (text) {
+      content += text
+      options.onDelta?.(text)
+    }
+  }
+
+  return { content, aborted: false, streamError }
 }
 
 /**
@@ -260,10 +403,23 @@ export async function requestChat(
   let timedOut = false
   const onAbort = () => controller.abort()
   options.signal?.addEventListener('abort', onAbort)
-  const timer = setTimeout(() => {
+
+  /*
+   * 流式下这个定时器是「多久没收到任何数据」，不是「总共多久」。
+   * 用总时长当上限会把正常的长回答掐断，而读者真正要防的是卡住不动。
+   */
+  let timer = setTimeout(() => {
     timedOut = true
     controller.abort()
   }, timeoutMs)
+  const touch = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeoutMs)
+  }
+  const streaming = typeof options.onDelta === 'function'
 
   try {
     const response = await doFetch(normalizeEndpoint(config.endpoint), {
@@ -272,7 +428,7 @@ export async function requestChat(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: buildBody(messages, config.model, config.webSearch),
+      body: buildBody(messages, config.model, config.webSearch, streaming),
       signal: controller.signal,
     })
 
@@ -286,11 +442,32 @@ export async function requestChat(
       }
     }
 
+    // 网关可能忽略 stream 参数照旧返回整段 JSON，按内容类型分流，不靠参数猜
+    const contentType = response.headers?.get?.('content-type') ?? ''
+    const looksLikeSse = contentType.includes('text/event-stream') || typeof response.body?.getReader === 'function'
+    if (streaming && looksLikeSse) {
+      const streamed = await readStream(response, controller, options, touch)
+      if (streamed.streamError) {
+        return { status: 'error', kind: 'network', message: streamed.streamError }
+      }
+      if (streamed.aborted) {
+        // 已经吐出去的字留在界面上，这里只告诉调用方是取消，不是失败
+        return streamed.content ? { status: 'ok', content: streamed.content, partial: true } : { status: 'aborted' }
+      }
+      const text = streamed.content.trim()
+      if (!text) {
+        return { status: 'error', kind: 'parse', message: '返回内容不是预期的对话结构。' }
+      }
+      return { status: 'ok', content: text }
+    }
+
     const body = await response.json().catch(() => null)
     const content = contentOf(body)
     if (!content) {
       return { status: 'error', kind: 'parse', message: '返回内容不是预期的对话结构。' }
     }
+    // 走了整段返回也要回调一次，界面才不至于空白
+    options.onDelta?.(content)
     return { status: 'ok', content }
   } catch (error) {
     if (timedOut) return { status: 'error', kind: 'timeout', message: '等待回复超时。' }

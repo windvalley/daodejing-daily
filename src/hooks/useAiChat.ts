@@ -25,6 +25,10 @@ export interface AiMessage {
   content: string
   /** 助手回复的引用核查结果 */
   report?: CitationReport
+  /** 正在流式写入的这条消息，界面据此显示光标 */
+  streaming?: boolean
+  /** 读者点了停止，回答到此为止 */
+  partial?: boolean
   /** 助手回复失败时，这条消息只承载错误，不参与后续对话历史 */
   error?: AiError
 }
@@ -70,7 +74,9 @@ export function useAiChat({ focus }: { focus: AiFocus }): UseAiChat {
         .slice(-MAX_HISTORY_MESSAGES)
 
       const asked: AiMessage = { id: (idRef.current += 1), role: 'user', content: text }
-      setMessages((previous) => [...previous, asked])
+      // 先占一条空的助手消息，增量往里追加，读者能看到字一个个出来
+      const replyId = (idRef.current += 1)
+      setMessages((previous) => [...previous, asked, { id: replyId, role: 'assistant', content: '', streaming: true }])
       setPending(true)
 
       const controller = new AbortController()
@@ -80,44 +86,61 @@ export function useAiChat({ focus }: { focus: AiFocus }): UseAiChat {
         current,
         {
           signal: controller.signal,
+          onDelta: (chunk) => {
+            setMessages((previous) =>
+              previous.map((message) =>
+                message.id === replyId ? { ...message, content: message.content + chunk } : message,
+              ),
+            )
+          },
         },
       )
       controllerRef.current = null
       setPending(false)
 
-      // 读者主动取消时不追加任何消息，提问留在列表里就够了
-      if (result.status === 'aborted') return
-
       setMessages((previous) => {
-        if (result.status === 'ok') {
-          return [
-            ...previous,
-            {
-              id: (idRef.current += 1),
-              role: 'assistant',
-              content: result.content,
-              report: checkCitations(result.content),
-            },
-          ]
+        // 取消时已经写出来的部分留着，标记成不完整，且不做引用核查
+        if (result.status === 'aborted') {
+          return previous.map((message) =>
+            message.id === replyId && message.content ? { ...message, streaming: false, partial: true } : message,
+          )
         }
-        return [
-          ...previous,
-          {
-            id: (idRef.current += 1),
-            role: 'assistant',
-            content: '',
-            error: { kind: result.kind, message: result.message, question: text },
-          },
-        ]
+
+        if (result.status === 'ok') {
+          return previous.map((message) =>
+            message.id === replyId
+              ? {
+                  ...message,
+                  content: result.content,
+                  streaming: false,
+                  partial: result.partial === true,
+                  // 被截断的回答做引用核查没有意义，只会把断句判成「引文有问题」
+                  report: result.partial ? undefined : checkCitations(result.content),
+                }
+              : message,
+          )
+        }
+
+        // 一个字都没收到时把占位消息换成错误块；已经出了字就保留正文，不让错误覆盖已写内容
+        return previous.map((message) => {
+          if (message.id !== replyId) return message
+          return message.content
+            ? { ...message, streaming: false, partial: true }
+            : { ...message, streaming: false, error: { kind: result.kind, message: result.message, question: text } }
+        })
       })
     },
     [focus, messages, pending],
   )
 
+  /**
+   * 只发取消信号，不清 pending。
+   * 清了会让输入框立刻可以再发，而旧请求可能还没真正结束，
+   * 两个请求并发时 controllerRef 被覆盖，旧的那个再也停不下来。
+   * 等请求自己退出来，在结果处理里统一清掉。
+   */
   const cancel = useCallback(() => {
     controllerRef.current?.abort()
-    controllerRef.current = null
-    setPending(false)
   }, [])
 
   const clear = useCallback(() => {

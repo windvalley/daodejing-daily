@@ -4214,6 +4214,29 @@ input[type='range'] {
   font-size: 13px;
 }
 
+/* 流式写入光标。用边框做一个不占位的方块，结束后整段消失 */
+.ai-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: ai-caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes ai-caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-caret {
+    animation: none;
+  }
+}
+
 .ai-cites {
   display: flex;
   flex-wrap: wrap;
