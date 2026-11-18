@@ -77,8 +77,10 @@ const QUOTE_PATTERNS = [/「([^」]{2,80})」/g, /“([^”]{2,80})”/g, /"([^"
 
 export interface RawQuote {
   text: string
-  /** 引文在回答里的起始位置，用来找它前面点名的是哪一章 */
+  /** 引文在回答里的起始位置（含开头引号），用来找它前面点名的是哪一章 */
   index: number
+  /** 引文结束位置（闭合引号之后），用来找它后面跟的「出自第 N 章」 */
+  end: number
 }
 
 /** 抽取引号里的片段。同一句用不同引号重复出现只留第一次 */
@@ -89,7 +91,9 @@ export function extractQuoteSpans(answer: string): RawQuote[] {
     let match = pattern.exec(answer)
     while (match) {
       const quote = match[1].trim()
-      if (quote && !found.some((item) => item.text === quote)) found.push({ text: quote, index: match.index })
+      if (quote && !found.some((item) => item.text === quote)) {
+        found.push({ text: quote, index: match.index, end: match.index + match[0].length })
+      }
       match = pattern.exec(answer)
     }
   })
@@ -104,24 +108,51 @@ export function extractQuotes(answer: string): string[] {
 const SENTENCE_BREAK = /[。！？；\n]/
 
 /**
- * 引文前面最近一次点名的是哪一章。
+ * 引文后面跟出处的连接词：出自、语出、见于、出于、载于、见、在、即、是、约。
  *
- * 只在同一句里找：跨句去猜会让「第四十二章讲道生一。这一点和「上善若水」相通」这类写法误判。
- * 找不到明确的标称就返回 null，不硬套。
+ * 必须含实词。只允许标点的话，「「上善若水」，「第42章又讲……」」这种换了一处引文的写法
+ * 会被误判成前一句出自第 42 章。
  */
-export function claimedChapterOf(answer: string, quoteIndex: number): number | null {
+const TRAILING_LINK = /^(?:出自于|出自|语出|见于|出于|载于|见|在|即|是|约)[\s：:，,]*$/
+
+const CHAPTER_PATTERN = /第\s*(\d{1,2}|[一二三四五六七八九十]+)\s*章/g
+
+function validChapter(input: string): number | null {
+  const number = chineseChapterNumber(input)
+  return number && number >= 1 && number <= chapters.length ? number : null
+}
+
+/**
+ * 引文标称的是哪一章。
+ *
+ * 先看后置：「『道法自然』出自第25章」。中文里这是最常见的写法，而章号在引文后面，
+ * 只往前找就会错配到上一条引文的章号。真实模型的回答里出现过
+ * 「『道法自然』出自第25章，『不为而成』出自第47章」，结果前者正确、后者被当成第 25 章。
+ *
+ * 再看前置：「第8章说『上善若水』」。只在同一句里找：跨句去猜会让
+ * 「第四十二章讲道生一。这一点和『上善若水』相通」这类写法误判。
+ * 两处都找不到明确的标称就返回 null，不硬套。
+ */
+export function claimedChapterOf(answer: string, quoteIndex: number, quoteEnd = quoteIndex): number | null {
+  const after = answer.slice(quoteEnd)
+  const trailing = /^([^。！？；\n]{0,8}?)第\s*(\d{1,2}|[一二三四五六七八九十]+)\s*章/.exec(after)
+  if (trailing && TRAILING_LINK.test(trailing[1])) {
+    const number = validChapter(trailing[2])
+    if (number) return number
+  }
+
   const before = answer.slice(0, quoteIndex)
-  const match = /第\s*(\d{1,2}|[一二三四五六七八九十]+)\s*章/g
   let claimed: number | null = null
-  let found = match.exec(before)
+  CHAPTER_PATTERN.lastIndex = 0
+  let found = CHAPTER_PATTERN.exec(before)
   while (found) {
     const gap = before.slice(found.index + found[0].length)
     // 标称与引文之间隔了句号问号，说明这句引文不归那句话管
     if (!SENTENCE_BREAK.test(gap)) {
-      const number = chineseChapterNumber(found[1])
-      if (number && number >= 1 && number <= chapters.length) claimed = number
+      const number = validChapter(found[1])
+      if (number) claimed = number
     }
-    found = match.exec(before)
+    found = CHAPTER_PATTERN.exec(before)
   }
   return claimed
 }
@@ -229,7 +260,7 @@ export function checkCitations(answer: string): CitationReport {
   extractQuoteSpans(answer).forEach((quote) => {
     if (!isCheckable(quote.text)) return
     const chapter = findQuoteChapter(quote.text)
-    const claimed = claimedChapterOf(answer, quote.index)
+    const claimed = claimedChapterOf(answer, quote.index, quote.end)
     quotes.push({
       text: quote.text,
       chapter,
