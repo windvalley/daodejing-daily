@@ -19,6 +19,7 @@ const config: AiConfig = {
   model: 'test-model',
   apiKey: 'sk-test',
   economy: false,
+  webSearch: false,
 }
 
 function renderApp(path = '/chapters/1') {
@@ -129,7 +130,9 @@ describe('提问与回答', () => {
     await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '这句话出自哪里？')
     await user.click(within(dialog).getByRole('button', { name: '发送' }))
 
-    expect(await within(dialog).findByText('有 1 处引文未在书中找到，请以章页原文为准。')).toBeInTheDocument()
+    expect(
+      await within(dialog).findByText('「道法自然，无为而成」未在书中找到，请以章页原文为准。'),
+    ).toBeInTheDocument()
   })
 
   it('引文都对得上时不打扰读者', async () => {
@@ -366,6 +369,44 @@ describe('评审补充：引文出处', () => {
     await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '这句话在哪一章？')
     await user.click(within(dialog).getByRole('button', { name: '发送' }))
 
-    expect(await within(dialog).findByText('有 1 处引文的章号对不上，请以章页原文为准。')).toBeInTheDocument()
+    expect(
+      await within(dialog).findByText('「上善若水，水善利万物而不争」实际出自第8章，回答里标成了第42章。'),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('联网搜索开关', () => {
+  it('未开启时请求体不带 tools，提示词说明没有联网能力', async () => {
+    saveAiConfig({ ...config, webSearch: false })
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '好。' })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '问一句')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+    await within(dialog).findByText('好。')
+
+    const messages = aiMocks.requestChat.mock.calls[0][0] as { content: string }[]
+    expect(messages[0].content).toContain('没有联网与检索能力')
+    expect(messages[0].content).not.toContain('你可以调用联网搜索')
+  })
+
+  it('开启后提示词改为允许检索，并要求与本书分开标注', async () => {
+    saveAiConfig({ ...config, webSearch: true })
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '好。' })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    expect(within(dialog).getByText(/已开启联网/)).toBeInTheDocument()
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '和光同尘现在什么意思')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+    await within(dialog).findByText('好。')
+
+    const messages = aiMocks.requestChat.mock.calls[0][0] as { content: string }[]
+    expect(messages[0].content).toContain('你可以调用联网搜索')
+    expect(messages[0].content).toContain('必须与本书分开说明')
+    expect(messages[0].content).not.toContain('你没有联网与检索能力')
   })
 })

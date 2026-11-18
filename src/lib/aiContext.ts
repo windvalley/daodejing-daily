@@ -32,6 +32,24 @@ export const AI_RULES = [
   '6. 读者问的是生活里的具体处境时，给一步今天能做的事，不要泛泛而谈。',
 ].join('\n')
 
+/**
+ * 联网开启时追加的规则。
+ *
+ * 两部分缺一不可：允许检索，以及把检索来的内容与本书严格分开。
+ * 这个应用的价值在底本与训释，「网上说」一旦与本书混为一谈就失去意义。
+ */
+export const AI_WEB_RULES = [
+  '7. 你可以调用联网搜索，用来回答本书之外的问题，例如现代汉语的常用义、成语的流变、其他注家的说法。',
+  '8. 联网得到的内容必须与本书分开说明：引用时讲清这是书外说法、来自哪里，不要把它写成本书的训释。',
+  '9. 两者冲突时以本书材料为准，并如实指出分歧，不要用网络说法覆盖底本。',
+].join('\n')
+
+/** 没有联网能力时用的规则，只在没开联网工具时说 */
+export const AI_OFFLINE_RULES = [
+  '7. 你没有联网与检索能力，拿不到本书之外的信息。读者让你联网搜索时，直接说明做不到，不要假装查过；',
+  '   若他确实需要本书以外的说法，说明你可以凭既有知识补充，但要讲清那不是本书内容、也可能过时。',
+].join('\n')
+
 function formatChapter(chapter: Chapter): string {
   const lines: string[] = []
   lines.push(`### 第${chapter.number}章 ${chapter.title}（${chapter.section === 'dao' ? '道经' : '德经'}）`)
@@ -62,9 +80,10 @@ export function buildBookMaterial(): string {
  * 早先这里塞过一份八十一章目录，但省流模式的承诺就是「只发当前这一章」，
  * 目录本身又是三千多字符，等于把省下的流量又花回去，界面文案也会变成假话。
  */
-export function buildSystemPrompt(options: { economy?: boolean } = {}): string {
-  if (options.economy) return AI_RULES
-  return [AI_RULES, '【全书】\n' + buildBookMaterial()].join('\n\n')
+export function buildSystemPrompt(options: { economy?: boolean; webSearch?: boolean } = {}): string {
+  const rules = [AI_RULES, options.webSearch ? AI_WEB_RULES : AI_OFFLINE_RULES].join('\n')
+  if (options.economy) return rules
+  return [rules, '【全书】\n' + buildBookMaterial()].join('\n\n')
 }
 
 /**
@@ -169,10 +188,12 @@ export function buildAskMessages(
   question: string,
   focus: AiFocus,
   history: ChatMessage[] = [],
-  options: { economy?: boolean } = {},
+  options: { economy?: boolean; webSearch?: boolean } = {},
 ): ChatMessage[] {
   const economy = options.economy === true
-  const messages: ChatMessage[] = [{ role: 'system', content: buildSystemPrompt({ economy }) }]
+  const messages: ChatMessage[] = [
+    { role: 'system', content: buildSystemPrompt({ economy, webSearch: options.webSearch === true }) },
+  ]
 
   const recent = history
     .filter((message) => message.role !== 'system' && message.content.trim())

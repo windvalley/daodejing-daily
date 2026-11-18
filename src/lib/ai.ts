@@ -15,6 +15,8 @@ export interface AiConfig {
   apiKey: string
   /** 省流模式：只发当前章节，不发全书 */
   economy: boolean
+  /** 联网搜索：由服务端执行检索，用来回答本书之外的问题 */
+  webSearch: boolean
 }
 
 export type ChatRole = 'system' | 'user' | 'assistant'
@@ -31,6 +33,7 @@ export const EMPTY_AI_CONFIG: AiConfig = {
   model: '',
   apiKey: '',
   economy: false,
+  webSearch: false,
 }
 
 /** 默认 30 秒。全书前缀约两万 token，慢一点的模型也要留出余量 */
@@ -61,6 +64,7 @@ export function sanitizeAiConfig(input: unknown): AiConfig {
     model: text(input.model),
     apiKey: text(input.apiKey),
     economy: input.economy === true,
+    webSearch: input.webSearch === true,
   }
 }
 
@@ -174,9 +178,20 @@ export function clearAiConfig(): void {
   }
 }
 
-/** 请求体只带最小字段，避免不同厂商忽略不认识的参数时报错 */
-function buildBody(messages: ChatMessage[], model: string): string {
-  return JSON.stringify({ model, messages, stream: false })
+/**
+ * DeepSeek 的联网搜索是服务端工具，声明后由服务端执行检索并附引用。
+ * type 必须是 deepseek_web_search：写成 OpenAI 的 web_search 会被 422 拒绝。
+ */
+export const WEB_SEARCH_TOOL = { type: 'deepseek_web_search' } as const
+
+/**
+ * 请求体只带最小字段，避免不同厂商忽略不认识的参数时报错。
+ * tools 仅在读者主动开启联网时才带，没开时请求体与之前完全一致。
+ */
+function buildBody(messages: ChatMessage[], model: string, webSearch = false): string {
+  const body: Record<string, unknown> = { model, messages, stream: false }
+  if (webSearch) body.tools = [WEB_SEARCH_TOOL]
+  return JSON.stringify(body)
 }
 
 function errorKindOfStatus(status: number): AiErrorKind {
@@ -257,7 +272,7 @@ export async function requestChat(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: buildBody(messages, config.model),
+      body: buildBody(messages, config.model, config.webSearch),
       signal: controller.signal,
     })
 

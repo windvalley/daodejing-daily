@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getChapter } from '../data/chapters'
 import {
+  AI_OFFLINE_RULES,
   AI_RULES,
+  AI_WEB_RULES,
   MAX_HISTORY_MESSAGES,
   buildAskMessages,
   buildBookMaterial,
@@ -44,7 +46,7 @@ describe('system 提示词', () => {
 
   it('省流模式只给规则，书里的内容一个字都不带', () => {
     const prompt = buildSystemPrompt({ economy: true })
-    expect(prompt).toBe(AI_RULES)
+    expect(prompt).toBe(`${AI_RULES}\n${AI_OFFLINE_RULES}`)
     expect(prompt).not.toContain('### 第1章 体道')
     expect(prompt).not.toContain('【全书目录】')
   })
@@ -221,7 +223,7 @@ describe('损坏的路径片段', () => {
 describe('省流模式的载荷', () => {
   it('章页只发当前这一章，system 里一个字都不带别的章节', () => {
     const messages = buildAskMessages('问', { kind: 'chapter', chapter: 8 }, [], { economy: true })
-    expect(messages[0].content).toBe(AI_RULES)
+    expect(messages[0].content).toBe(`${AI_RULES}\n${AI_OFFLINE_RULES}`)
     expect(messages[0].content).not.toContain('第1章')
     const prompt = messages.map((message) => message.content).join('')
     expect(prompt).toContain('上善若水')
@@ -236,5 +238,36 @@ describe('省流模式的载荷', () => {
     // 「德」关联二十六章，正文全塞进来会超过一万字符
     expect(prompt.length).toBeLessThan(2500)
     expect(prompt.match(/### 第/g) ?? []).toHaveLength(0)
+  })
+})
+
+describe('联网规则', () => {
+  it('默认按没有联网能力说明，不假装查过', () => {
+    expect(AI_OFFLINE_RULES).toContain('没有联网与检索能力')
+    expect(AI_OFFLINE_RULES).toContain('不要假装查过')
+    expect(buildSystemPrompt()).toContain(AI_OFFLINE_RULES)
+    expect(buildSystemPrompt()).not.toContain(AI_WEB_RULES)
+  })
+
+  it('开启联网时换成允许检索的规则，并要求与本书分开', () => {
+    const prompt = buildSystemPrompt({ webSearch: true })
+    expect(prompt).toContain(AI_WEB_RULES)
+    expect(prompt).not.toContain('你没有联网与检索能力')
+    expect(AI_WEB_RULES).toContain('必须与本书分开说明')
+    expect(AI_WEB_RULES).toContain('以本书材料为准')
+  })
+
+  it('两套规则互斥，不会同时出现', () => {
+    for (const webSearch of [true, false]) {
+      const prompt = buildSystemPrompt({ webSearch })
+      expect(prompt.includes(AI_WEB_RULES)).toBe(webSearch)
+      expect(prompt.includes(AI_OFFLINE_RULES)).toBe(!webSearch)
+    }
+  })
+
+  it('省流模式也按开关选规则', () => {
+    const online = buildSystemPrompt({ economy: true, webSearch: true })
+    expect(online).toContain(AI_WEB_RULES)
+    expect(online).not.toContain('【全书】')
   })
 })
