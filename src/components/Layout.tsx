@@ -49,7 +49,8 @@ export function Layout() {
 
   /*
    * 收起面板时把焦点还给入口。
-   * 面板里的链接会换到别的页面，焦点跟着新页面走更自然，因此单独走 onNavigate。
+   * 面板里的链接会换到别的页面，此时链接所在的面板已经 inert，
+   * 不再把焦点拉回悬浮球，交给新页面按常规处理。
    */
   const closeAi = useCallback(() => {
     setAiOpen(false)
@@ -131,11 +132,15 @@ export function Layout() {
           </div>
         </header>
 
+        {/*
+         * 入口是 fixed 定位，放在 main 之前只影响 Tab 顺序：
+         * 键盘读者从页首过来不必先穿过正文里的二十多个控件才能到它。
+         */}
+        <AiLauncher open={aiOpen} onOpen={() => setAiOpen(true)} buttonRef={launcherRef} />
+
         <main className="content" id="main-content">
           <Outlet />
         </main>
-
-        <AiLauncher open={aiOpen} onOpen={() => setAiOpen(true)} buttonRef={launcherRef} />
 
         <nav className="bottom-nav" aria-label="底部导航">
           {bottomNav.map((item) => (

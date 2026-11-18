@@ -46,8 +46,9 @@ export function AiLauncher({
    * 焦点在入口上时不收起。
    * 用 Tab 走到这里时浏览器会把按钮滚进视口，这次滚动同样触发 onScroll；
    * 若照常隐藏，焦点会落在一个 visibility: hidden 的按钮上，读屏与 :focus-visible 都失效。
+   * 面板打开时也不收起：关闭后要能把焦点还给入口，藏起来的按钮接不住 focus()。
    */
-  const hidden = scrolling && !focused
+  const hidden = scrolling && !focused && !open
 
   return (
     <button
@@ -65,7 +66,7 @@ export function AiLauncher({
         问
       </span>
       <span className="ai-launcher-label" aria-hidden="true">
-        问道
+        道
       </span>
     </button>
   )

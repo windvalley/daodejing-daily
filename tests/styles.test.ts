@@ -132,3 +132,38 @@ describe('章页注音排版', () => {
     expect(ruleBody(selector)).toMatch(/white-space:\s*nowrap/)
   })
 })
+
+describe('问道入口只有一个', () => {
+  it('旧的侧栏按钮与浮动按钮类名都已删除', () => {
+    // 两个入口靠断点切换，改一处容易漏另一处；类名残留往往意味着规则还在
+    expect(css).not.toContain('.ai-entry')
+    expect(css).not.toContain('.ai-fab')
+    expect(css).toContain('.ai-launcher')
+  })
+
+  it('没有任何断点把入口藏起来', () => {
+    // 之前宽屏用 display: none 隐藏浮动按钮、改走侧栏，这条断言专防它回来。
+    // 打印样式本来就该藏，先摘掉再查，否则专防的那条会被它盖过去。
+    const screenCss = css.replace(mediaBody('print'), '')
+    const launcherRules = [...screenCss.matchAll(/\.ai-launcher[^{]*\{([^}]*)\}/g)].map((match) => match[1])
+    const hiding = launcherRules.filter((body) => /display:\s*none/.test(body))
+    expect(hiding).toEqual([])
+  })
+
+  it('打印时入口不出现', () => {
+    expect(mediaBody('print')).toMatch(/\.ai-launcher/)
+  })
+
+  it('展开靠设备能力判断悬停，不靠视口宽度', () => {
+    // 平板接鼠标、窄窗口接键盘同样需要「问道」这行字
+    const hoverBlock = mediaBody('(hover: hover)')
+    expect(hoverBlock).toMatch(/\.ai-launcher:hover/)
+    expect(ruleBody('\\.ai-launcher:focus-visible')).toMatch(/width:/)
+  })
+
+  it('滚动收起用 visibility，隐藏后不再接收点击', () => {
+    const hidden = ruleBody('\\.ai-launcher\\.is-hidden')
+    expect(hidden).toMatch(/visibility:\s*hidden/)
+    expect(hidden).toMatch(/pointer-events:\s*none/)
+  })
+})

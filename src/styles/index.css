@@ -3924,7 +3924,9 @@ input[type='range'] {
 /*
  * 唯一入口：所有断点共用一个右下角悬浮球。
  * 之前宽屏在侧栏、窄屏在底栏上方，两条链路改一处容易漏另一处。
- * 鼠标设备上悬停或聚焦时展开「问道」二字：只有一个「问」字，新读者不容易看出这是对话。
+ * 收起时只有一个「问」，展开时补上「道」，读起来是「问道」；
+ * 两个字从不同时出现，快速划过也不会看到重影。
+ * 展开看设备能力而不是视口宽度：平板接蓝牙鼠标、窄窗口里接键盘，同样需要这行提示。
  */
 .ai-launcher {
   position: fixed;
@@ -3935,7 +3937,8 @@ input[type='range'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  /* 两个汉字之间不加间隙：收起时那个字会被 max-width: 0 收掉，居中才不会偏 */
+  gap: 0;
   width: 48px;
   height: 48px;
   padding: 0;
@@ -3956,29 +3959,24 @@ input[type='range'] {
   background: var(--accent-soft);
 }
 
-.ai-launcher-seal {
+/* 两个字同字号同字体，展开时只多出一个字，字重与基线不会跳 */
+.ai-launcher-seal,
+.ai-launcher-label {
   flex: none;
-  max-width: 2em;
-  overflow: hidden;
   font-family: var(--font-serif);
   font-size: 17px;
   font-weight: 600;
   line-height: 1;
-  opacity: 1;
-  transition:
-    max-width 180ms ease,
-    opacity 120ms ease;
+  white-space: nowrap;
 }
 
 .ai-launcher-label {
   max-width: 0;
   overflow: hidden;
   opacity: 0;
-  font-size: 13px;
-  white-space: nowrap;
   transition:
     max-width 180ms ease,
-    opacity 120ms ease;
+    opacity 140ms ease;
 }
 
 /*
@@ -3996,28 +3994,35 @@ input[type='range'] {
     visibility 0s linear 180ms;
 }
 
-@media (min-width: 1024px) {
-  /* 宽屏没有底栏，落回常规边距 */
-  .ai-launcher {
-    bottom: calc(24px + var(--safe-bottom));
+/* 触屏没有真正的悬停，展开只对鼠标设备开放 */
+@media (hover: hover) {
+  .ai-launcher:hover {
+    width: 80px;
   }
 
-  .ai-launcher:hover,
-  .ai-launcher:focus-visible {
-    width: 96px;
-  }
-
-  /* 展开时换成「问道」二字，不保留印章里的「问」，否则读起来是「问问道」 */
-  .ai-launcher:hover .ai-launcher-seal,
-  .ai-launcher:focus-visible .ai-launcher-seal {
-    max-width: 0;
-    opacity: 0;
-  }
-
-  .ai-launcher:hover .ai-launcher-label,
-  .ai-launcher:focus-visible .ai-launcher-label {
-    max-width: 2.6em;
+  .ai-launcher:hover .ai-launcher-label {
+    max-width: 1.2em;
     opacity: 1;
+  }
+}
+
+/* 键盘聚焦在任何宽度都展开，窄屏接键盘时同样要能看清这是「问道」 */
+.ai-launcher:focus-visible {
+  width: 80px;
+}
+
+.ai-launcher:focus-visible .ai-launcher-label {
+  max-width: 1.2em;
+  opacity: 1;
+}
+
+@media (min-width: 1024px) {
+  /*
+   * 宽屏没有底栏，落回常规边距。
+   * 16 像素让球顶正好落在正文底部内边距（64 像素）处，滚到底也不会压住分页卡。
+   */
+  .ai-launcher {
+    bottom: calc(16px + var(--safe-bottom));
   }
 }
 
@@ -4064,7 +4069,7 @@ input[type='range'] {
 }
 
 @media (max-width: 1023px) {
-  /* 悬浮按钮占距底边 72 到 118 像素的一条，内容区原有 96 像素不够，滚到底时文字会被压住 */
+  /* 悬浮球占距底边 78 到 126 像素的一条，内容区原有 96 像素不够，滚到底时文字会被压住 */
   .content {
     padding-bottom: calc(132px + var(--safe-bottom));
   }
