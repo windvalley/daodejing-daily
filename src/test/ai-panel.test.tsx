@@ -462,3 +462,115 @@ describe('联网搜索开关', () => {
     expect(messages[0].content).not.toContain('你没有联网与检索能力')
   })
 })
+
+describe('流式输出', () => {
+  it('增量到达时逐字出现在界面上，结束后光标消失', async () => {
+    saveAiConfig(config)
+    // 模拟流式：先吐两段，再给出完整结果
+    let emit: ((text: string) => void) | undefined
+    aiMocks.requestChat.mockImplementation((_messages, _config, options) => {
+      emit = options?.onDelta
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          emit?.('第8章把「上善」')
+          emit?.('解作最高的善。')
+          resolve({ status: 'ok', content: '第8章把「上善」解作最高的善。' })
+        }, 0)
+      })
+    })
+
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '上善是什么')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByText('第8章把「上善」解作最高的善。')).toBeInTheDocument()
+    // 结束后不该再留光标
+    await waitFor(() => expect(dialog.querySelector('.ai-caret')).toBeNull())
+  })
+
+  it('第一个字回来之前显示正在翻书', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockReturnValue(new Promise(() => {}))
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '慢问题')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByText('正在翻书…')).toBeInTheDocument()
+  })
+
+  it('中途停止时保留已写出的内容，并说明未写完', async () => {
+    saveAiConfig(config)
+    let emit: ((text: string) => void) | undefined
+    aiMocks.requestChat.mockImplementation((_messages, _config, options) => {
+      emit = options?.onDelta
+      return new Promise((resolve) => {
+        // 一直不 resolve，等测试点停止
+        setTimeout(() => emit?.('第8章讲水'), 0)
+        setTimeout(() => resolve({ status: 'ok', content: '第8章讲水', partial: true }), 50)
+      })
+    })
+
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '长回答')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByText('第8章讲水')).toBeInTheDocument()
+    expect(await within(dialog).findByText('已停止生成，上面是未写完的部分。')).toBeInTheDocument()
+  })
+
+  it('被截断的回答不做引用核查，避免把断句判成引文有问题', async () => {
+    saveAiConfig(config)
+    // 截断发生在生成中途：前半段引对了，后半截是模型没说完就停下的编造
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '第8章说「上善若水，水善利万物而不争」。第42章又讲「道法自然，无为而成」',
+      partial: true,
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '问')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText(/道法自然，无为而成/)
+    // 完整回答里这句会被判「未在书中找到」；截断时不该报，因为那不是要复核的对象
+    expect(within(dialog).queryByText(/未在书中找到/)).toBeNull()
+  })
+})
+
+describe('停止生成', () => {
+  it('点停止后按钮在请求真正结束前不会变回可发送', async () => {
+    saveAiConfig(config)
+    let finish: (() => void) | undefined
+    aiMocks.requestChat.mockImplementation(
+      (_m, _c, options) =>
+        new Promise((resolve) => {
+          finish = () => resolve({ status: 'aborted' })
+          options?.signal?.addEventListener('abort', () => {}, { once: true })
+        }),
+    )
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '长问题')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await user.click(await within(dialog).findByRole('button', { name: '停止' }))
+    // 请求还没退出，仍然不该出现可发送的按钮
+    expect(within(dialog).queryByRole('button', { name: '发送' })).toBeNull()
+
+    finish?.()
+    expect(await within(dialog).findByRole('button', { name: '发送' })).toBeInTheDocument()
+  })
+})
