@@ -183,3 +183,49 @@ describe('真实回答里出现过的两种引法', () => {
     expect(report.unverified).toBe(1)
   })
 })
+
+describe('章号放在引文后面', () => {
+  it('「X」出自第 N 章 这种写法要认', () => {
+    const answer = '「上善若水，水善利万物而不争」出自第8章。'
+    const report = checkCitations(answer)
+    expect(report.quotes[0]).toMatchObject({ chapter: 8, claimed: 8, misattributed: false })
+    expect(citationNotice(report)).toBeNull()
+  })
+
+  it('「X」见第 N 章 与「X」在第 N 章 也要认', () => {
+    for (const connector of ['见', '在', '见于', '语出']) {
+      const answer = `「上善若水，水善利万物而不争」${connector}第8章。`
+      expect(checkCitations(answer).quotes[0].claimed).toBe(8)
+    }
+  })
+
+  it('同一个引号里并排出现的两处出处不互相串', () => {
+    // 这是真实模型给出的回答，修之前「不为而成」被当成第 25 章
+    const answer = '「道法自然」出自第25章，「不为而成」出自第47章，第42章讲的是「道生一，一生二，二生三，三生万物」。'
+    const report = checkCitations(answer)
+    const byText = new Map(report.quotes.map((quote) => [quote.text, quote]))
+    expect(byText.get('道法自然')).toMatchObject({ chapter: 25, claimed: 25 })
+    expect(byText.get('不为成')).toBeUndefined()
+    expect(byText.get('不为而成')).toMatchObject({ chapter: 47, claimed: 47, misattributed: false })
+    expect(report.misattributed).toBe(0)
+  })
+
+  it('后置只隔着标点时不当成出处，那是另起一处话', () => {
+    // 「上善若水」后面只是逗号加一句新的话，不是「出自第42章」的出处声明
+    const answer = '「上善若水」，第42章讲的是另一回事。'
+    expect(checkCitations(answer).quotes.find((quote) => quote.text === '上善若水')?.claimed).toBeNull()
+    expect(checkCitations(answer).misattributed).toBe(0)
+  })
+
+  it('后置章号写错时照样报，不能因为改了查找方向就放过', () => {
+    const answer = '「上善若水，水善利万物而不争」出自第42章。'
+    const report = checkCitations(answer)
+    expect(report.quotes[0]).toMatchObject({ chapter: 8, claimed: 42, misattributed: true })
+    expect(citationNotice(report)).toBe('有 1 处引文的章号对不上，请以章页原文为准。')
+  })
+
+  it('前后都有章号时以后面紧跟的为准', () => {
+    const answer = '第1章先说过，「上善若水，水善利万物而不争」出自第8章。'
+    expect(checkCitations(answer).quotes[0]).toMatchObject({ chapter: 8, claimed: 8, misattributed: false })
+  })
+})
