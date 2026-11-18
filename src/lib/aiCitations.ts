@@ -138,29 +138,85 @@ function isCheckable(quote: string): boolean {
 }
 
 let normalizedTexts: Map<number, string> | null = null
+let normalizedMaterials: Map<number, string> | null = null
 
-function chapterTexts(): Map<number, string> {
-  if (normalizedTexts === null) {
-    normalizedTexts = new Map(chapters.map((chapter) => [chapter.number, normalize(chapter.text.join(''))]))
-  }
+const textIndex = (): Map<number, string> => {
+  normalizedTexts ??= new Map(chapters.map((chapter) => [chapter.number, normalize(chapter.text.join(''))]))
   return normalizedTexts
+}
+
+/**
+ * 一章的全部材料：原文之外还有译文、章旨、注释与实践提示。
+ *
+ * 只查原文会误报。真实模型回答「上善」时引了注释里的「最高的善」，那是书里的话，
+ * 却不在原文里；读者看到「未在原文中找到」只会觉得这个提示是坏的。
+ */
+const materialIndex = (): Map<number, string> => {
+  if (normalizedMaterials === null) {
+    normalizedMaterials = new Map(
+      chapters.map((chapter) => [
+        chapter.number,
+        normalize(
+          [
+            chapter.text.join(''),
+            chapter.gist,
+            chapter.translation,
+            chapter.practice,
+            ...chapter.notes.map((note) => `${note.term}${note.text}`),
+          ].join(''),
+        ),
+      ]),
+    )
+  }
+  return normalizedMaterials
+}
+
+/**
+ * 引文按标点切成若干片段。
+ *
+ * 模型常把同一章隔着几句的两截并进一个引号，如第 81 章「利而不害，为而不争」，
+ * 原文中间还隔着「圣人之道」。整串去重后不是连续子串，但每一截都在这一章里，
+ * 这是省略式引用，不该判成编造。
+ */
+function fragmentsOf(quote: string): string[] {
+  return quote
+    .split(/[，。；：、！？,.!?;:\s]+/)
+    .map((fragment) => normalize(fragment))
+    .filter(Boolean)
+}
+
+function containsAll(text: string | undefined, fragments: string[]): boolean {
+  if (!text || !fragments.length) return false
+  return fragments.every((fragment) => text.includes(fragment))
 }
 
 /** 逐章查找引文，返回第一个包含它的章号 */
 export function findQuoteChapter(quote: string): number | null {
   const plain = normalize(quote)
   if (!plain) return null
-  for (const [number, text] of chapterTexts()) {
+  const fragments = fragmentsOf(quote)
+  // 先按原文整串找，能找到就是最干净的情况
+  for (const [number, text] of textIndex()) {
     if (text.includes(plain)) return number
+  }
+  // 再按原文的片段找，处理省略式引用
+  for (const [number, text] of textIndex()) {
+    if (fragments.length > 1 && containsAll(text, fragments)) return number
+  }
+  // 最后放宽到整章材料，注释与译文也算书里的话
+  for (const [number, text] of materialIndex()) {
+    if (text.includes(plain)) return number
+  }
+  for (const [number, text] of materialIndex()) {
+    if (fragments.length > 1 && containsAll(text, fragments)) return number
   }
   return null
 }
 
 /** 引文是否出自某一章 */
 export function quoteInChapter(quote: string, chapter: number): boolean {
-  const text = chapterTexts().get(chapter)
-  const plain = normalize(quote)
-  return Boolean(text && plain && text.includes(plain))
+  const fragments = fragmentsOf(quote)
+  return containsAll(textIndex().get(chapter), fragments) || containsAll(materialIndex().get(chapter), fragments)
 }
 
 /**
@@ -200,7 +256,7 @@ export function citationNotice(report: CitationReport): string | null {
     return `有 ${report.misattributed} 处引文的章号对不上，请以章页原文为准。`
   }
   if (report.unverified > 0) {
-    return `有 ${report.unverified} 处引文未在原文中找到，请以章页原文为准。`
+    return `有 ${report.unverified} 处引文未在书中找到，请以章页原文为准。`
   }
   return null
 }

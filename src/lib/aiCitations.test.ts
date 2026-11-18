@@ -89,7 +89,7 @@ describe('提示文案', () => {
 
   it('有对不上的引文时给出可数提示', () => {
     expect(citationNotice(checkCitations('他说「道法自然，无为而成」。'))).toBe(
-      '有 1 处引文未在原文中找到，请以章页原文为准。',
+      '有 1 处引文未在书中找到，请以章页原文为准。',
     )
   })
 })
@@ -132,7 +132,7 @@ describe('章号与引文的对应', () => {
     expect(report.quotes[0]).toMatchObject({ verified: false, misattributed: false })
     expect(report.unverified).toBe(1)
     expect(report.misattributed).toBe(0)
-    expect(citationNotice(report)).toBe('有 1 处引文未在原文中找到，请以章页原文为准。')
+    expect(citationNotice(report)).toBe('有 1 处引文未在书中找到，请以章页原文为准。')
   })
 })
 
@@ -158,5 +158,28 @@ describe('引文归属单章', () => {
     expect(quoteInChapter('上善若水，水善利万物而不争', 8)).toBe(true)
     expect(quoteInChapter('上善若水，水善利万物而不争', 42)).toBe(false)
     expect(quoteInChapter('不存在的句子', 8)).toBe(false)
+  })
+})
+
+describe('真实回答里出现过的两种引法', () => {
+  it('引注释里的话不算编造', () => {
+    // 第 8 章注释「上善」训作「最高的善」，模型引用它是书里的话
+    const report = checkCitations('第8章注释把「上善」训为「最高的善」。')
+    expect(report.quotes.find((quote) => quote.text === '最高的善')).toMatchObject({ chapter: 8, verified: true })
+    expect(report.unverified).toBe(0)
+    expect(citationNotice(report)).toBeNull()
+  })
+
+  it('省略中间几句的合并引文不算编造', () => {
+    // 第 81 章原文是「天之道，利而不害；圣人之道，为而不争」，中间还隔着「圣人之道」
+    const report = checkCitations('第81章「利而不害，为而不争」讲的就是不争。')
+    expect(report.quotes[0]).toMatchObject({ chapter: 81, verified: true, misattributed: false })
+    expect(report.unverified).toBe(0)
+  })
+
+  it('把两章的句子并进一个引号仍然判为找不到', () => {
+    const report = checkCitations('「上善若水，道法自然」。')
+    expect(report.quotes[0].verified).toBe(false)
+    expect(report.unverified).toBe(1)
   })
 })

@@ -64,6 +64,31 @@ export function sanitizeAiConfig(input: unknown): AiConfig {
   }
 }
 
+/**
+ * 把读者填的地址补全成真正的接口地址。
+ *
+ * 各家文档给的往往是服务根地址（如 https://api.deepseek.com），直接 POST 上去是 404，
+ * 而 404 在界面上只会显示成「请求失败（HTTP 404）」，读者根本不知道少写了一段路径。
+ * 这里只处理两种能确定的情况，其余原样保留，免得自作主张把自定义网关的路径改坏：
+ *
+ * - 已经以 /chat/completions 结尾：不动。
+ * - 以 /v1、/v2 这类版本段结尾：补 /chat/completions。
+ * - 只有协议与主机：补 /v1/chat/completions。
+ */
+export function normalizeEndpoint(input: string): string {
+  const value = input.trim().replace(/\/+$/, '')
+  if (!value) return ''
+  if (/\/chat\/completions$/.test(value)) return value
+  if (/\/v\d+[a-z0-9.-]*$/i.test(value)) return `${value}/chat/completions`
+  try {
+    const url = new URL(value)
+    if (url.pathname === '/' || url.pathname === '') return `${url.origin}/v1/chat/completions`
+  } catch {
+    return value
+  }
+  return value
+}
+
 /** 三项都填了才算配置完成；省流开关不影响可用性 */
 export function isAiConfigured(config: AiConfig): boolean {
   return Boolean(config.endpoint && config.model && config.apiKey)
@@ -226,7 +251,7 @@ export async function requestChat(
   }, timeoutMs)
 
   try {
-    const response = await doFetch(config.endpoint, {
+    const response = await doFetch(normalizeEndpoint(config.endpoint), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
