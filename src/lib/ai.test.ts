@@ -18,6 +18,7 @@ const config: AiConfig = {
   model: 'test-model',
   apiKey: 'sk-test',
   economy: false,
+  webSearch: false,
 }
 
 const messages: ChatMessage[] = [{ role: 'user', content: '道可道是什么意思？' }]
@@ -52,6 +53,7 @@ describe('配置读写', () => {
       model: 'test-model',
       apiKey: 'sk-test',
       economy: true,
+      webSearch: false,
     })
   })
 
@@ -244,5 +246,28 @@ describe('地址补全', () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: '好' } }] }))
     await requestChat(messages, { ...config, endpoint: 'https://api.deepseek.com' }, { fetchImpl })
     expect(fetchImpl.mock.calls[0][0]).toBe('https://api.deepseek.com/v1/chat/completions')
+  })
+})
+
+describe('联网工具', () => {
+  it('未开启联网时请求体不带 tools，保证老配置行为不变', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: '好' } }] }))
+    await requestChat(messages, { ...config, webSearch: false }, { fetchImpl })
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body)
+    expect(body.tools).toBeUndefined()
+  })
+
+  it('开启后按 DeepSeek 的工具名声明 deepseek_web_search', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: '好' } }] }))
+    await requestChat(messages, { ...config, webSearch: true }, { fetchImpl })
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body)
+    // 写成 OpenAI 的 web_search 会被服务端 422 拒绝
+    expect(body.tools).toEqual([{ type: 'deepseek_web_search' }])
+  })
+
+  it('联网开关默认关闭，且能被清洗保留', () => {
+    expect(EMPTY_AI_CONFIG.webSearch).toBe(false)
+    expect(sanitizeAiConfig({ endpoint: 'x', model: 'y', apiKey: 'z', webSearch: true }).webSearch).toBe(true)
+    expect(sanitizeAiConfig({ endpoint: 'x', model: 'y', apiKey: 'z' }).webSearch).toBe(false)
   })
 })

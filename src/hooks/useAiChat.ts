@@ -75,9 +75,13 @@ export function useAiChat({ focus }: { focus: AiFocus }): UseAiChat {
 
       const controller = new AbortController()
       controllerRef.current = controller
-      const result = await requestChat(buildAskMessages(text, focus, history, { economy: current.economy }), current, {
-        signal: controller.signal,
-      })
+      const result = await requestChat(
+        buildAskMessages(text, focus, history, { economy: current.economy, webSearch: current.webSearch }),
+        current,
+        {
+          signal: controller.signal,
+        },
+      )
       controllerRef.current = null
       setPending(false)
 

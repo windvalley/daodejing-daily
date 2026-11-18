@@ -249,6 +249,7 @@ function AiSession({ open, focus, onClose }: { open: boolean; focus: AiFocus; on
               {chat.config.economy
                 ? '省流模式已打开：只发送当前这一章，别章的内容发不出去。'
                 : '全书八十一章已作为材料发过去，可以直接问别章。'}
+              {chat.config.webSearch ? '已开启联网，书外的说法会单独标注来源。' : ''}
             </p>
             {seeds.length ? (
               <div className="ai-seeds">

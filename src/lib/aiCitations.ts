@@ -12,11 +12,16 @@ import { normalize } from './memorize'
 export interface CitationQuote {
   /** 回答里引号中的原文片段，保留原样 */
   text: string
-  /** 引文实际所在的章，对不上任何一章时为 null */
-  chapter: number | null
-  /** 回答给这句标称的章号；没在引文前点名某章时为 null */
+  /**
+   * 引文实际出现的所有章，按章号升序；找不到时为空数组。
+   *
+   * 存数组而不是单个章号：「和光同尘」在第 4 章与第 56 章的注释里都有，
+   * 只记第一个命中的章，会把读者指向第 56 章的正确说法判成写错。
+   */
+  chapters: number[]
+  /** 回答给这句标称的章号；没有明确出处声明时为 null */
   claimed: number | null
-  /** 在原文里找得到 */
+  /** 在书里找得到 */
   verified: boolean
   /** 找得到，但不在回答说的那一章 */
   misattributed: boolean
@@ -108,12 +113,15 @@ export function extractQuotes(answer: string): string[] {
 const SENTENCE_BREAK = /[。！？；\n]/
 
 /**
- * 引文后面跟出处的连接词：出自、语出、见于、出于、载于、见、在、即、是、约。
+ * 引文后面跟出处的连接词：出自、语出、见于、出于、载于、见、在。
  *
- * 必须含实词。只允许标点的话，「「上善若水」，「第42章又讲……」」这种换了一处引文的写法
- * 会被误判成前一句出自第 42 章。
+ * 只认明确的出处声明。两类别扭进来：
+ * - 光有标点：「「上善若水」，「第42章又讲……」」是另起一处引文，不是前一句的出处。
+ * - 「是」「即」「约」这类系词：「「适可而止」是第9章「持而盈之」的意思」讲的是释义关系，
+ *   并不声称这句出自第九章。真实回答里「适可而止」恰好也出现在第三十二章译文里，
+ *   认了系词就会把一句准确的话报成章号写错。
  */
-const TRAILING_LINK = /^(?:出自于|出自|语出|见于|出于|载于|见|在|即|是|约)[\s：:，,]*$/
+const TRAILING_LINK = /^(?:出自于|出自|语出|见于|出于|载于|见|在)[\s：:，,]*$/
 
 const CHAPTER_PATTERN = /第\s*(\d{1,2}|[一二三四五六七八九十]+)\s*章/g
 
@@ -221,27 +229,48 @@ function containsAll(text: string | undefined, fragments: string[]): boolean {
   return fragments.every((fragment) => text.includes(fragment))
 }
 
-/** 逐章查找引文，返回第一个包含它的章号 */
-export function findQuoteChapter(quote: string): number | null {
+/**
+ * 引文出现在哪几章。
+ *
+ * 同一句话可能落在多章，例如「和光同尘」在第 4 章与第 56 章的注释里都出现，
+ * 「知止」在第三十二章与第四十四章都有。只认第一个命中的章会把正确的引用判成写错，
+ * 所以这里收集全部命中章，由调用方判断回答说的那一章在不在其中。
+ */
+export function findQuoteChapters(quote: string): number[] {
   const plain = normalize(quote)
-  if (!plain) return null
+  if (!plain) return []
   const fragments = fragmentsOf(quote)
-  // 先按原文整串找，能找到就是最干净的情况
+
+  // 整串命中最干净，命中就直接返回，不再退到片段匹配
+  const exact: number[] = []
   for (const [number, text] of textIndex()) {
-    if (text.includes(plain)) return number
+    if (text.includes(plain)) exact.push(number)
   }
-  // 再按原文的片段找，处理省略式引用
-  for (const [number, text] of textIndex()) {
-    if (fragments.length > 1 && containsAll(text, fragments)) return number
+  if (exact.length) return exact
+
+  const byFragments: number[] = []
+  if (fragments.length > 1) {
+    for (const [number, text] of textIndex()) {
+      if (containsAll(text, fragments)) byFragments.push(number)
+    }
+    if (byFragments.length) return byFragments
   }
+
   // 最后放宽到整章材料，注释与译文也算书里的话
   for (const [number, text] of materialIndex()) {
-    if (text.includes(plain)) return number
+    if (text.includes(plain)) exact.push(number)
   }
+  if (exact.length) return exact
+
   for (const [number, text] of materialIndex()) {
-    if (fragments.length > 1 && containsAll(text, fragments)) return number
+    if (fragments.length > 1 && containsAll(text, fragments)) byFragments.push(number)
   }
-  return null
+  return byFragments
+}
+
+/** 逐章查找引文，返回第一个包含它的章号；界面提示以外的地方用得上 */
+export function findQuoteChapter(quote: string): number | null {
+  return findQuoteChapters(quote)[0] ?? null
 }
 
 /** 引文是否出自某一章 */
@@ -259,15 +288,16 @@ export function checkCitations(answer: string): CitationReport {
   const quotes: CitationQuote[] = []
   extractQuoteSpans(answer).forEach((quote) => {
     if (!isCheckable(quote.text)) return
-    const chapter = findQuoteChapter(quote.text)
+    const found = findQuoteChapters(quote.text)
     const claimed = claimedChapterOf(answer, quote.index, quote.end)
     quotes.push({
       text: quote.text,
-      chapter,
+      chapters: found,
       claimed,
-      verified: chapter !== null,
-      // 只在校验通过、且回答明确说了出处、且说的不是同一章时才算写错
-      misattributed: chapter !== null && claimed !== null && claimed !== chapter,
+      verified: found.length > 0,
+      // 只有「书里确实有这句、但不在回答说的那一章」才算写错；
+      // 这句话可能同时出现在好几章，只要包含回答说的那一章就不算错
+      misattributed: found.length > 0 && claimed !== null && !found.includes(claimed),
     })
   })
   return {
@@ -279,17 +309,36 @@ export function checkCitations(answer: string): CitationReport {
 }
 
 /**
- * 界面提示文案。出处写错比找不到更值得说，所以优先报它。
- * 引用全部对得上时返回 null，不打扰读者。
+ * 界面提示文案。引用全部对得上时返回 null，不打扰读者。
+ *
+ * 只有一处写错时直接把「哪一句、实际在哪一章」写出来，读者能立刻核对；
+ * 「有 N 处章号对不上」这种笼统提示，在一段长回答里等于没说。
  */
 export function citationNotice(report: CitationReport): string | null {
-  if (report.misattributed > 0) {
-    return `有 ${report.misattributed} 处引文的章号对不上，请以章页原文为准。`
+  const notices: string[] = []
+
+  const wrong = report.quotes.filter((quote) => quote.misattributed)
+  if (wrong.length === 1) {
+    const [quote] = wrong
+    notices.push(`「${quote.text}」实际出自第${quote.chapters[0]}章，回答里标成了第${quote.claimed}章。`)
+  } else if (wrong.length > 1) {
+    notices.push(`有 ${wrong.length} 处引文的章号对不上，请以章页原文为准。`)
   }
-  if (report.unverified > 0) {
-    return `有 ${report.unverified} 处引文未在书中找到，请以章页原文为准。`
+
+  const missing = report.quotes.filter((quote) => !quote.verified)
+  if (missing.length === 1) {
+    // 点名是哪一句。真实回答里常把转述也打上引号（如「给日程留白」），
+    // 只说「有 1 处」读者无从判断，把原话摆出来他一眼就知道那是自己的转述。
+    notices.push(`「${missing[0].text}」未在书中找到，请以章页原文为准。`)
+  } else if (missing.length > 1) {
+    const names = missing
+      .slice(0, 2)
+      .map((quote) => `「${quote.text}」`)
+      .join('')
+    notices.push(`${names}等 ${missing.length} 处引文未在书中找到，请以章页原文为准。`)
   }
-  return null
+
+  return notices.length ? notices.join('') : null
 }
 
 /** 回答里点到但书里没有的章号，用于给模型纠错，不弹给读者 */

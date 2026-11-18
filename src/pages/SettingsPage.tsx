@@ -410,6 +410,17 @@ export function SettingsPage() {
           </div>
           <div className="setting-block">
             <Toggle
+              checked={aiConfig.webSearch}
+              onChange={(webSearch) => {
+                setAiSaved(false)
+                setAiConfig({ ...aiConfig, webSearch })
+              }}
+              label="允许联网搜索"
+              description="开启后，问本书之外的事（现代汉语用法、其他注家、成语流变）时会由 DeepSeek 服务端联网检索。回答会把网上的说法与本书分开标注；不开启时模型只能依据本书作答。每次开启联网的提问都会记入你的 API 用量。"
+            />
+          </div>
+          <div className="setting-block">
+            <Toggle
               checked={aiConfig.economy}
               onChange={(economy) => {
                 setAiSaved(false)
