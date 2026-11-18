@@ -12,7 +12,15 @@ import { useSpeech } from '../hooks/useSpeech'
 import { chineseVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
 import { actions, exportData, parseImport, type SpeechTimbre, type ThemeMode } from '../lib/store'
 import { saveBackup } from '../lib/backup'
-import { EMPTY_AI_CONFIG, clearAiConfig, isAiConfigured, loadAiConfig, saveAiConfig, type AiConfig } from '../lib/ai'
+import {
+  EMPTY_AI_CONFIG,
+  clearAiConfig,
+  isAiConfigured,
+  loadAiConfig,
+  normalizeEndpoint,
+  saveAiConfig,
+  type AiConfig,
+} from '../lib/ai'
 
 const themeOptions: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
@@ -347,13 +355,22 @@ export function SettingsPage() {
               inputMode="url"
               autoComplete="off"
               spellCheck={false}
-              placeholder="https://api.example.com/v1/chat/completions"
+              placeholder="https://api.deepseek.com"
               value={aiConfig.endpoint}
               onChange={(event) => {
                 setAiSaved(false)
                 setAiConfig({ ...aiConfig, endpoint: event.target.value })
               }}
             />
+            {/*
+             * 各家文档给的常是服务根地址，直接发过去是 404，而界面上只会显示成「请求失败」。
+             * 这里把实际会请求的地址显出来，读者一眼能看出补全成了什么，不必猜。
+             */}
+            {aiConfig.endpoint.trim() && normalizeEndpoint(aiConfig.endpoint) !== aiConfig.endpoint.trim() ? (
+              <p className="setting-note">实际会请求：{normalizeEndpoint(aiConfig.endpoint)}</p>
+            ) : (
+              <p className="setting-note">填服务根地址也可以，会自动补成 /v1/chat/completions。</p>
+            )}
           </div>
           <div className="setting-block">
             <label className="field-label" htmlFor="ai-model">
@@ -365,7 +382,7 @@ export function SettingsPage() {
               type="text"
               autoComplete="off"
               spellCheck={false}
-              placeholder="deepseek-chat"
+              placeholder="deepseek-flash"
               value={aiConfig.model}
               onChange={(event) => {
                 setAiSaved(false)

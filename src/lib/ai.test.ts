@@ -5,6 +5,7 @@ import {
   clearAiConfig,
   isAiConfigured,
   loadAiConfig,
+  normalizeEndpoint,
   requestChat,
   sanitizeAiConfig,
   saveAiConfig,
@@ -202,5 +203,46 @@ describe('请求', () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('Failed to fetch'))
     const result = await requestChat(messages, config, { fetchImpl })
     expect(result).toEqual({ status: 'error', kind: 'network', message: 'Failed to fetch' })
+  })
+})
+
+describe('地址补全', () => {
+  it('只填服务根地址时补成完整接口地址', () => {
+    expect(normalizeEndpoint('https://api.deepseek.com')).toBe('https://api.deepseek.com/v1/chat/completions')
+    expect(normalizeEndpoint('https://api.deepseek.com/')).toBe('https://api.deepseek.com/v1/chat/completions')
+    expect(normalizeEndpoint('  https://api.deepseek.com  ')).toBe('https://api.deepseek.com/v1/chat/completions')
+  })
+
+  it('填到版本段时只补后半截', () => {
+    expect(normalizeEndpoint('https://api.openai.com/v1')).toBe('https://api.openai.com/v1/chat/completions')
+    expect(normalizeEndpoint('https://api.openai.com/v1/')).toBe('https://api.openai.com/v1/chat/completions')
+  })
+
+  it('已经是完整接口地址时不动', () => {
+    expect(normalizeEndpoint('https://api.deepseek.com/v1/chat/completions')).toBe(
+      'https://api.deepseek.com/v1/chat/completions',
+    )
+    expect(normalizeEndpoint('https://api.deepseek.com/chat/completions/')).toBe(
+      'https://api.deepseek.com/chat/completions',
+    )
+  })
+
+  it('自定义网关路径不猜，原样保留', () => {
+    expect(normalizeEndpoint('https://gw.example.com/proxy/llm')).toBe('https://gw.example.com/proxy/llm')
+    expect(normalizeEndpoint('https://gw.example.com/proxy/llm/v1')).toBe(
+      'https://gw.example.com/proxy/llm/v1/chat/completions',
+    )
+  })
+
+  it('空值与非法输入不制造出奇怪地址', () => {
+    expect(normalizeEndpoint('')).toBe('')
+    expect(normalizeEndpoint('   ')).toBe('')
+    expect(normalizeEndpoint('api.deepseek.com')).toBe('api.deepseek.com')
+  })
+
+  it('请求真正打到补全后的地址，而不是读者填的根地址', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: '好' } }] }))
+    await requestChat(messages, { ...config, endpoint: 'https://api.deepseek.com' }, { fetchImpl })
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.deepseek.com/v1/chat/completions')
   })
 })

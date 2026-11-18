@@ -129,7 +129,7 @@ describe('提问与回答', () => {
     await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '这句话出自哪里？')
     await user.click(within(dialog).getByRole('button', { name: '发送' }))
 
-    expect(await within(dialog).findByText('有 1 处引文未在原文中找到，请以章页原文为准。')).toBeInTheDocument()
+    expect(await within(dialog).findByText('有 1 处引文未在书中找到，请以章页原文为准。')).toBeInTheDocument()
   })
 
   it('引文都对得上时不打扰读者', async () => {
