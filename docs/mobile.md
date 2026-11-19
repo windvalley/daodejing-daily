@@ -12,7 +12,17 @@
 
 ## 二、iPhone
 
-iOS 无法像安卓那样直接装自签名安装包，需要 Apple 开发者账号和 Xcode 才能出 `.ipa`。目前的替代方案是把站点部署到 HTTPS 地址，用 Safari 打开后「添加到主屏幕」，安装后同样可以全屏、离线使用。
+iOS 无法像安卓那样直接装自签名安装包，需要 Apple 开发者账号和 Xcode 才能出 `.ipa`。
+正式入口是部署在 GitHub Pages 的 PWA：<https://windvalley.github.io/daodejing-daily/>。
+用 Safari 打开后点分享按钮 → 添加到主屏幕，安装后同样可以全屏、离线使用。
+站点由 GitHub Actions 在合入 `main` 后自动部署，子路径与 404 回退的配置见 `.github/workflows/pages.yml`。
+
+iPhone 上的边界：
+
+- 学习数据保存在 Safari 的网站数据中。装到主屏后不受 Safari 的七天清理规则影响，但删除图标、清除网站数据、换设备或换域名都会丢，备份要在「我的」里导出。
+- 朗读走 Web Speech API，依赖系统语音包；静音拨片打开、锁屏或切到后台都会停止，也没有安卓 TTS 的后台播放。
+- 没有通知，也不经过应用商店；主屏 Web App 的 Web Push 本站未实现。
+- 仓库里没有 iOS 原生工程（`ios/` 目录与 `@capacitor/ios` 都没有装），模拟器只有安卓一侧。
 
 ## 三、界面如何避让系统栏
 
@@ -29,7 +39,6 @@ iOS 无法像安卓那样直接装自签名安装包，需要 Apple 开发者账
 ## 四、真机模拟器测试
 
 本机已配好两个可直接跑的安卓模拟器，用来验证边到边布局、主题切换、完整学习流程与朗读。
-仓库里没有 iOS 原生工程（`ios/` 目录与 `@capacitor/ios` 都没有装），模拟器只有安卓一侧。
 
 - `ddj-phone` 用 `default` 镜像，启动快，适合看布局和流程，但没有语音引擎。
 - `ddj-phone-tts` 用 `google_apis` 镜像，自带 Google 语音引擎，验证朗读必须用它。

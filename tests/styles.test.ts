@@ -97,6 +97,11 @@ describe('布局收缩', () => {
   it('body 兜底禁止横向滚动，固定底栏不会被挤出视口', () => {
     expect(ruleBody('body')).toMatch(/overflow-x:\s*hidden/)
   })
+
+  it('全屏高度带 dvh 兜底，iOS 地址栏收放时不会留出空档', () => {
+    expect(ruleBody('body')).toMatch(/min-height:\s*100dvh/)
+    expect(ruleBody('\\.app-shell')).toMatch(/min-height:\s*100dvh/)
+  })
 })
 
 describe('背诵主视觉', () => {

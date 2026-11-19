@@ -102,6 +102,8 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  /* iOS Safari 地址栏收放时 100vh 不跟着变，dvh 跟可视区域走；旧浏览器落到上一行 */
+  min-height: 100dvh;
   /* 兜底：任何意外溢出都不让页面横向滚动，也不把固定底栏挤出屏幕 */
   overflow-x: hidden;
   background-color: var(--bg);
@@ -192,6 +194,7 @@ svg {
 .app-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .sidebar {

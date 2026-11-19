@@ -29,6 +29,24 @@ function renderApp(path = '/') {
   )
 }
 
+/** jsdom 没有 speechSynthesis，补一个空实现，让朗读相关文案按「支持朗读」渲染 */
+function stubSpeechSynthesis() {
+  Object.defineProperty(window, 'speechSynthesis', {
+    value: {
+      getVoices: () => [],
+      cancel: () => {},
+      speak: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    },
+    configurable: true,
+  })
+}
+
+function restoreSpeechSynthesis() {
+  delete (window as { speechSynthesis?: unknown }).speechSynthesis
+}
+
 beforeEach(() => {
   window.localStorage.clear()
   actions.replaceAll(createDefaultData())
@@ -435,18 +453,27 @@ describe('设置页', () => {
       { voiceURI: 'zh-Hans', name: 'Chinese China', lang: 'zh-Hans', localService: true },
       { voiceURI: 'en', name: 'English', lang: 'en', localService: true },
     ]
-    // jsdom 没有 speechSynthesis，补一个空实现让试听按钮可用，才能看到音色说明
-    Object.defineProperty(window, 'speechSynthesis', {
-      value: { getVoices: () => [], cancel: () => {}, speak: () => {} },
-      configurable: true,
-    })
+    stubSpeechSynthesis()
     try {
       renderApp('/settings')
       await screen.findByText(/这台设备只有这一个中文音色/)
       expect(screen.getByRole('group', { name: '选择朗读音色' })).toBeInTheDocument()
       expect(screen.queryByLabelText(/系统音色/)).not.toBeInTheDocument()
     } finally {
-      delete (window as { speechSynthesis?: unknown }).speechSynthesis
+      restoreSpeechSynthesis()
+    }
+  })
+
+  it('读不到音色时不再一直显示正在读取', async () => {
+    // iOS 首次 getVoices() 为空，读完就要给结论，不能让文案卡在加载中
+    voiceMocks.voices = []
+    stubSpeechSynthesis()
+    try {
+      renderApp('/settings')
+      await screen.findByText(/没有读取到中文音色/)
+      expect(screen.queryByText(/正在读取系统音色/)).not.toBeInTheDocument()
+    } finally {
+      restoreSpeechSynthesis()
     }
   })
 
