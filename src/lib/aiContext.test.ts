@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getChapter } from '../data/chapters'
+import { chapters, getChapter } from '../data/chapters'
 import {
   AI_OFFLINE_RULES,
   AI_RULES,
@@ -156,11 +156,20 @@ describe('消息装配', () => {
 })
 
 describe('种子问题', () => {
-  it('从本章注释与概念生成，不调用模型', () => {
+  it('从本章注释、概念与实践生成，不调用模型', () => {
     const questions = seedQuestions(1)
-    expect(questions).toHaveLength(3)
+    expect(questions).toHaveLength(4)
     expect(questions[0]).toBe('「道可道」该怎样理解？')
     expect(questions[2]).toContain('道')
+    expect(questions[3]).toBe('这一章该怎么实践？')
+  })
+
+  it('每章最后一条都落到实践，不被注释与概念挤掉', () => {
+    chapters.forEach((chapter) => {
+      const questions = seedQuestions(chapter.number)
+      expect(questions).toHaveLength(4)
+      expect(questions[questions.length - 1]).toBe('这一章该怎么实践？')
+    })
   })
 
   it('章号不存在时返回空数组', () => {

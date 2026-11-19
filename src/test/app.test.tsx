@@ -29,6 +29,33 @@ function renderApp(path = '/') {
   )
 }
 
+/**
+ * jsdom 没有 speechSynthesis，补一个空实现，让朗读相关文案按「支持朗读」渲染。
+ * 返回 emitVoicesChanged，用来模拟系统装好中文语音包后补发 voiceschanged。
+ */
+function stubSpeechSynthesis() {
+  const listeners = new Set<() => void>()
+  Object.defineProperty(window, 'speechSynthesis', {
+    value: {
+      getVoices: () => [],
+      cancel: () => {},
+      speak: () => {},
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === 'voiceschanged') listeners.add(listener)
+      },
+      removeEventListener: (type: string, listener: () => void) => {
+        if (type === 'voiceschanged') listeners.delete(listener)
+      },
+    },
+    configurable: true,
+  })
+  return () => listeners.forEach((listener) => listener())
+}
+
+function restoreSpeechSynthesis() {
+  delete (window as { speechSynthesis?: unknown }).speechSynthesis
+}
+
 beforeEach(() => {
   window.localStorage.clear()
   actions.replaceAll(createDefaultData())
@@ -95,6 +122,16 @@ describe('章页', () => {
     await user.type(textarea, '今天绕开一次硬碰硬。')
     await user.click(screen.getByRole('button', { name: /保存笔记/ }))
     expect(getSnapshot().practice[8].text).toBe('今天绕开一次硬碰硬。')
+  })
+
+  it('带 focus=practice 进入章页时把践行笔记滚进视野并聚焦', async () => {
+    // 从今日功课跳过来时要停在笔记上；jsdom 没有 scrollIntoView，setup.ts 补了空实现
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    renderApp('/chapters/8?focus=practice')
+    const textarea = screen.getByLabelText('我的践行笔记')
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    expect(textarea).toHaveFocus()
+    scrollIntoView.mockRestore()
   })
 
   it('无效章号给出提示', () => {
@@ -435,18 +472,45 @@ describe('设置页', () => {
       { voiceURI: 'zh-Hans', name: 'Chinese China', lang: 'zh-Hans', localService: true },
       { voiceURI: 'en', name: 'English', lang: 'en', localService: true },
     ]
-    // jsdom 没有 speechSynthesis，补一个空实现让试听按钮可用，才能看到音色说明
-    Object.defineProperty(window, 'speechSynthesis', {
-      value: { getVoices: () => [], cancel: () => {}, speak: () => {} },
-      configurable: true,
-    })
+    stubSpeechSynthesis()
     try {
       renderApp('/settings')
       await screen.findByText(/这台设备只有这一个中文音色/)
       expect(screen.getByRole('group', { name: '选择朗读音色' })).toBeInTheDocument()
       expect(screen.queryByLabelText(/系统音色/)).not.toBeInTheDocument()
     } finally {
-      delete (window as { speechSynthesis?: unknown }).speechSynthesis
+      restoreSpeechSynthesis()
+    }
+  })
+
+  it('系统补发 voiceschanged 后重新读取音色', async () => {
+    // iOS 上先只有外语，中文语音包后装好，不重读就一直显示没有中文音色
+    voiceMocks.voices = [{ voiceURI: 'en', name: 'English', lang: 'en', localService: true }]
+    const emitVoicesChanged = stubSpeechSynthesis()
+    try {
+      renderApp('/settings')
+      await screen.findByText(/没有读取到中文音色/)
+      voiceMocks.voices = [
+        { voiceURI: 'zh-Hans', name: 'Chinese China', lang: 'zh-Hans', localService: true },
+        { voiceURI: 'zh-CN', name: 'Chinese China', lang: 'zh-CN', localService: true },
+      ]
+      act(() => emitVoicesChanged())
+      expect(await screen.findByLabelText(/系统音色/)).toBeInTheDocument()
+    } finally {
+      restoreSpeechSynthesis()
+    }
+  })
+
+  it('读不到音色时不再一直显示正在读取', async () => {
+    // iOS 首次 getVoices() 为空，读完就要给结论，不能让文案卡在加载中
+    voiceMocks.voices = []
+    stubSpeechSynthesis()
+    try {
+      renderApp('/settings')
+      await screen.findByText(/没有读取到中文音色/)
+      expect(screen.queryByText(/正在读取系统音色/)).not.toBeInTheDocument()
+    } finally {
+      restoreSpeechSynthesis()
     }
   })
 
