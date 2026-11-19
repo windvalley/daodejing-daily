@@ -342,10 +342,11 @@ describe('翻章后的会话边界', () => {
     await user.click(within(dialog).getByRole('button', { name: '发送' }))
     await within(dialog).findByText('第八章的回答。')
 
-    // 关掉面板、用章页底部的翻页链接走进下一章，App 不卸载，只有路由变化
+    // 关掉面板、用章页底部的翻页卡走进下一章，App 不卸载，只有路由变化
     await user.keyboard('{Escape}')
     await waitFor(() => expect(dialog).toHaveAttribute('aria-hidden', 'true'))
-    await user.click(screen.getByRole('link', { name: /下一章/ }))
+    const footerPager = screen.getByRole('navigation', { name: '章节导航' })
+    await user.click(within(footerPager).getByRole('link', { name: /下一章/ }))
 
     dialog = await openPanel(user)
     expect(within(dialog).getByText('正在读第9章 · 运夷')).toBeInTheDocument()

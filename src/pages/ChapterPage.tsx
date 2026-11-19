@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { useToast } from '../components/toast-context'
 import { getChapter, chapterLabel, type Chapter } from '../data/chapters'
@@ -29,6 +29,46 @@ function InvalidChapter({ number }: { number: string }) {
         </Link>
       </div>
     </div>
+  )
+}
+
+/**
+ * 原文后的就近翻页。
+ * 读者常常读完原文就想换章，而页底翻页卡要穿过章旨、译文、注释与践行笔记才够得到；
+ * 这里只给方向与章号，视觉重量低于页底卡片，不抢「学完这一章」的语义。
+ */
+function QuickPager({ previous, next }: { previous: Chapter | undefined; next: Chapter | undefined }) {
+  return (
+    <nav className="chapter-quicknav" aria-label="原文后翻页">
+      {previous ? (
+        <Link
+          className="quicknav-link"
+          to={`/chapters/${previous.number}`}
+          aria-label={`上一章：第${previous.number}章 ${previous.title}`}
+        >
+          <Icon name="chevronLeft" size={15} />
+          <span>
+            第{previous.number}章 {previous.title}
+          </span>
+        </Link>
+      ) : (
+        <span className="quicknav-link is-disabled">已是开头</span>
+      )}
+      {next ? (
+        <Link
+          className="quicknav-link"
+          to={`/chapters/${next.number}`}
+          aria-label={`下一章：第${next.number}章 ${next.title}`}
+        >
+          <span>
+            第{next.number}章 {next.title}
+          </span>
+          <Icon name="chevronRight" size={15} />
+        </Link>
+      ) : (
+        <span className="quicknav-link is-disabled">已是结尾</span>
+      )}
+    </nav>
   )
 }
 
@@ -78,13 +118,14 @@ function AnnotatedLine({ line, first }: { line: GlossLine; first: boolean }) {
   )
 }
 
-function ChapterView({ chapter }: { chapter: Chapter }) {
+function ChapterView({ chapter, headingRef }: { chapter: Chapter; headingRef: RefObject<HTMLHeadingElement | null> }) {
   usePageTitle(`${chapterLabel(chapter.number)} ${chapter.title}`)
   const data = useAppData()
   const now = useNow()
   const toast = useToast()
   const speech = useSpeech()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const progress = data.progress[chapter.number]
   const recite = data.recite[chapter.number]
   const review = data.review[chapter.number]
@@ -114,6 +155,33 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
     }, 120)
     return () => window.clearTimeout(timer)
   }, [searchParams, chapter.number])
+
+  /*
+   * 左右方向键翻章：桌面端读完一段不用回到页首或页底找链接。
+   * 输入框、可编辑区与问道面板里不接管，带修饰键的组合留给浏览器与系统；
+   * 首尾章的边界键不 preventDefault，免得白白吃掉一次滚动。
+   * 面板开着时按 document 判断而不是按事件目标：入口没配置 AI 时输入框不出现，
+   * 焦点会停在悬浮球上，事件目标落在面板外，只看目标会翻动背后被遮住的章节。
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      )
+        return
+      if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])')) return
+      const destination = event.key === 'ArrowLeft' ? previous : next
+      if (!destination) return
+      event.preventDefault()
+      navigate(`/chapters/${destination.number}`)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [navigate, previous, next])
 
   // 朗读文本走注音校正：多音字换成同音字再交给 TTS，避免引擎读错
   const speechText = useMemo(() => chapterSpeechText(chapter), [chapter])
@@ -172,7 +240,10 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
             <p className="page-eyebrow">
               {chapter.section === 'dao' ? '道经' : '德经'} · 第{chapter.number}章
             </p>
-            <h1>{chapter.title}</h1>
+            {/* 焦点在翻章后落到标题，读屏才会播报「已换到第几章」；标题可聚焦但不进 Tab 顺序 */}
+            <h1 ref={headingRef} tabIndex={-1} aria-label={`${chapterLabel(chapter.number)} ${chapter.title}`}>
+              {chapter.title}
+            </h1>
             <p className="chapter-gist-inline">{chapter.gist}</p>
           </div>
         </div>
@@ -264,6 +335,8 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
                 : chapter.text.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
             </div>
           </section>
+
+          <QuickPager previous={previous} next={next} />
 
           <section className="panel">
             <div className="section-heading">
@@ -524,9 +597,21 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
 export function ChapterPage() {
   const { number } = useParams<{ number: string }>()
   const chapter = number ? getChapter(Number(number)) : undefined
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const lastNumberRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const current = chapter?.number ?? null
+    const last = lastNumberRef.current
+    lastNumberRef.current = current
+    // 首次进入章页不抢焦点；只有在本页内翻到另一章时，把焦点交给新标题，读屏才知道已经换章
+    if (last === null || current === null || last === current) return
+    headingRef.current?.focus({ preventScroll: true })
+  }, [chapter?.number])
+
   if (!chapter || !Number.isInteger(Number(number))) {
     return <InvalidChapter number={number ?? ''} />
   }
   // 以章号作 key：切章时重置笔记草稿与展开状态，无需在 effect 里同步
-  return <ChapterView chapter={chapter} key={chapter.number} />
+  return <ChapterView chapter={chapter} headingRef={headingRef} key={chapter.number} />
 }
