@@ -97,6 +97,14 @@ describe('布局收缩', () => {
   it('body 兜底禁止横向滚动，固定底栏不会被挤出视口', () => {
     expect(ruleBody('body')).toMatch(/overflow-x:\s*hidden/)
   })
+
+  it('全屏高度带 dvh 兜底，iOS 地址栏收放时不会留出空档', () => {
+    // 旧浏览器不认 dvh，带兜底的顺序不能反，否则会在老 Safari 上整条失效
+    for (const selector of ['body', '\\.app-shell']) {
+      const body = ruleBody(selector)
+      expect(body).toMatch(/min-height:\s*100vh;[\s\S]*min-height:\s*100dvh/)
+    }
+  })
 })
 
 describe('背诵主视觉', () => {

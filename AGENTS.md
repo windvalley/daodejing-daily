@@ -83,7 +83,7 @@
 ## 路由、构建与原生壳
 
 - 路由使用 BrowserRouter，`basename` 取自 `import.meta.env.BASE_URL`。
-- 部署到子路径时用 `BASE_PATH=/daodejing/ pnpm build`，不要硬编码 `/`。
+- 部署到子路径时用 `BASE_PATH=/daodejing-daily/ pnpm build`，不要硬编码 `/`。
 - Service Worker 只在生产构建且非原生环境注册，原生壳内不要注册。
 - PWA 配置位于 `vite.config.ts`，`injectRegister` 为 `null`，注册逻辑手写在 `src/main.tsx`。
 - 原生环境通过 `window.Capacitor.isNativePlatform()` 判断，相关封装在 `src/lib/nativeTheme.ts` 与 `src/hooks/useSpeech.ts`。

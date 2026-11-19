@@ -9,7 +9,13 @@ import { useNow } from '../hooks/useNow'
 import { formatDateTime } from '../lib/date'
 import { getStats } from '../lib/stats'
 import { useSpeech } from '../hooks/useSpeech'
-import { chineseVoiceOptions, loadVoiceOptions, type VoiceOption } from '../lib/speechVoice'
+import {
+  chineseVoiceOptions,
+  loadVoiceOptions,
+  resetVoiceCache,
+  subscribeVoicesChanged,
+  type VoiceOption,
+} from '../lib/speechVoice'
 import { actions, exportData, parseImport, type SpeechTimbre, type ThemeMode } from '../lib/store'
 import { saveBackup } from '../lib/backup'
 import {
@@ -46,18 +52,28 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const speech = useSpeech()
   const [voices, setVoices] = useState<VoiceOption[]>([])
+  // 空列表分两种：还没读完，和读到了但没有中文音色，文案不能混用
+  const [voicesLoaded, setVoicesLoaded] = useState(false)
   // AI 配置不进 AppData，这里单独读一份，保存时写回独立的键
   const [aiConfig, setAiConfig] = useState<AiConfig>(() => loadAiConfig())
   const [aiSaved, setAiSaved] = useState(false)
 
-  // 音色列表要等原生插件就绪，进页面后异步读一次
+  // 音色列表要等原生插件就绪；iOS 首次还可能为空，等 voiceschanged 后再读一次
   useEffect(() => {
     let alive = true
-    void loadVoiceOptions().then((list) => {
-      if (alive) setVoices(list)
-    })
+    const load = () => {
+      resetVoiceCache()
+      void loadVoiceOptions().then((list) => {
+        if (!alive) return
+        setVoices(list)
+        setVoicesLoaded(true)
+      })
+    }
+    load()
+    const unsubscribe = subscribeVoicesChanged(load)
     return () => {
       alive = false
+      unsubscribe()
     }
   }, [])
   const chineseVoices = chineseVoiceOptions(voices)
@@ -250,7 +266,7 @@ export function SettingsPage() {
               <span className="muted-text">
                 {!speech.supported
                   ? '当前环境不支持朗读，音色设置不会生效。'
-                  : voices.length === 0
+                  : !voicesLoaded
                     ? '正在读取系统音色…'
                     : chineseVoices.length > 1
                       ? '音色由系统提供，换设备后可能需要重选。'

@@ -76,6 +76,7 @@ src/
   styles/            全局样式与响应式规则
   test/              数据层与页面测试
 android/             Capacitor 生成的安卓工程与图标、启动图
+.github/workflows/   GitHub Pages 自动部署
 scripts/build-apk.sh 一键构建 APK
 docs/ai.md          AI 助手的设计与边界
 docs/mobile.md      手机安装与更新说明
@@ -95,11 +96,22 @@ docs/mobile.md      手机安装与更新说明
 托管在子路径时用环境变量指定：
 
 ```bash
-BASE_PATH=/daodejing/ pnpm build
+BASE_PATH=/daodejing-daily/ pnpm build
 ```
 
 `base`、manifest 的 `start_url`、Service Worker 作用域与路由 basename 会一起跟随 `BASE_PATH`。
 本站使用 BrowserRouter，托管方需要把未知路径回退到 `index.html`。
+
+### GitHub Pages
+
+仓库带 GitHub Actions 工作流，合入 `main` 后自动构建并部署到：
+
+<https://windvalley.github.io/daodejing-daily/>
+
+工作流在部署前会先跑 `format:check`、`test`、`lint` 与 `build`，任一步失败都不会发布。
+子路径写在 `.github/workflows/pages.yml` 的 `BASE_PATH` 里，与仓库名保持一致；绑定自定义域名后要改成 `/`，否则资源与路由都会 404。
+Pages 不支持 SPA 回退，工作流会把 `dist/index.html` 复制一份成 `dist/404.html`，直接打开深层链接时应用仍能启动，只是响应状态是 404。
+首次启用时在仓库的 Settings → Pages 里把 Source 设为 GitHub Actions，之后每次合入 `main` 都会重新部署，也可以在 Actions 页面手动运行。
 
 ## 在手机上使用
 
@@ -137,12 +149,18 @@ pnpm preview:lan
 - 这是 HTTP 访问，浏览器不把它当作安全上下文，因此 **Service Worker 不会注册，离线不可用，也不能真正安装成 PWA**。阅读、背诵、写笔记与本地保存都正常。
 - 想查电脑的局域网地址，macOS 用 `ipconfig getifaddr en0`，Windows 用 `ipconfig`。
 
-### 三、部署后安装成 PWA（iOS 用这个）
+### 三、GitHub Pages 安装成 PWA（iOS 用这个）
 
-把 `dist/` 部署到任意 HTTPS 静态托管（Netlify、Vercel、Cloudflare Pages、GitHub Pages 等），手机访问该 HTTPS 地址后：
+在 iPhone 的 Safari 打开 <https://windvalley.github.io/daodejing-daily/>，点分享按钮 → 添加到主屏幕。
+装好后从桌面图标启动，全屏运行，首次打开过的内容断网也能读。
+安卓 Chrome 也可以打开同一地址，从右上角菜单安装应用。
 
-- **iOS Safari**：分享按钮 → 添加到主屏幕。
-- **Android Chrome**：右上角菜单 → 安装应用 / 添加到主屏幕。
+iOS 上有几点与安卓 APK 不同：
+
+- 数据存在 Safari 的网站数据里。装到主屏后不受 Safari 的七天清理规则影响，但删除图标、清除网站数据、换手机或换域名都会丢；换设备前先在「我的」导出备份，再到新设备导入。
+- 朗读走 Web Speech API，依赖系统语音包；静音拨片打开、锁屏或切到后台都会停止，也没有安卓 TTS 那样的后台播放。
+- 没有应用商店分发，也没有通知；iOS 16.4 起主屏 Web App 支持 Web Push，但本站没有实现。
+- 想要独立安装包、后台朗读与通知，需要另做 Capacitor iOS 工程和 Apple 开发者账号，GitHub Pages 给不了这些能力。
 
 安装后可全屏运行、断网可用。只有 HTTPS（或 localhost）才会被浏览器视为安全上下文，PWA 与离线缓存依赖这一点。
 

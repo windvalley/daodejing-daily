@@ -1,12 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { TextToSpeech } from '@capacitor-community/text-to-speech'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   chineseVoiceOptions,
   findVoiceIndex,
+  loadVoiceOptions,
   resetVoiceCache,
   timbrePitch,
   toVoiceOptions,
   type VoiceEntry,
 } from './speechVoice'
+
+vi.mock('@capacitor-community/text-to-speech', () => ({
+  TextToSpeech: { getSupportedVoices: vi.fn() },
+}))
+
+const getSupportedVoices = vi.mocked(TextToSpeech.getSupportedVoices)
 
 /** 与 Pixel 7 / Android 16 / Google TTS 返回结构一致 */
 const pixelVoices: VoiceEntry[] = [
@@ -121,6 +129,54 @@ describe('朗读音色列表', () => {
   it('缓存可重置', () => {
     resetVoiceCache()
     expect(true).toBe(true)
+  })
+})
+
+describe('音色列表读取', () => {
+  beforeEach(() => {
+    resetVoiceCache()
+    getSupportedVoices.mockReset()
+  })
+
+  it('首次读到空列表时不缓存，系统就绪后仍能读到音色', async () => {
+    // iOS 首次 getVoices() 返回空数组，voiceschanged 之后才有值
+    getSupportedVoices.mockResolvedValueOnce({ voices: [] })
+    getSupportedVoices.mockResolvedValueOnce({ voices: singleVoicePhone as unknown as SpeechSynthesisVoice[] })
+    expect(await loadVoiceOptions()).toEqual([])
+    const options = await loadVoiceOptions()
+    expect(options.map((item) => item.uri)).toContain('zh-CN-language')
+  })
+
+  it('读取失败不缓存，下次进设置页还能重试', async () => {
+    getSupportedVoices.mockRejectedValueOnce(new Error('引擎还没就绪'))
+    getSupportedVoices.mockResolvedValueOnce({ voices: singleVoicePhone as unknown as SpeechSynthesisVoice[] })
+    expect(await loadVoiceOptions()).toEqual([])
+    expect((await loadVoiceOptions()).map((item) => item.uri)).toContain('zh-CN-language')
+  })
+
+  it('浏览器里直接读 speechSynthesis，绕开插件可能过期的缓存', async () => {
+    // Capacitor 的 Web 实现把首次非空列表存在闭包里，中文语音包后装好也不会更新
+    let voices: VoiceEntry[] = [{ voiceURI: 'en-us-x-iob-local', lang: 'en-US', localService: true }]
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: { getVoices: () => voices, addEventListener: () => {}, removeEventListener: () => {} },
+      configurable: true,
+    })
+    try {
+      expect(chineseVoiceOptions(await loadVoiceOptions())).toHaveLength(0)
+      voices = [...voices, { voiceURI: 'zh-Hans-language', lang: 'zh-Hans', localService: true }]
+      resetVoiceCache()
+      expect(chineseVoiceOptions(await loadVoiceOptions()).map((item) => item.uri)).toEqual(['zh-Hans-language'])
+      expect(getSupportedVoices).not.toHaveBeenCalled()
+    } finally {
+      delete (window as { speechSynthesis?: unknown }).speechSynthesis
+    }
+  })
+
+  it('读到音色后走缓存，不重复调用插件', async () => {
+    getSupportedVoices.mockResolvedValue({ voices: singleVoicePhone as unknown as SpeechSynthesisVoice[] })
+    await loadVoiceOptions()
+    await loadVoiceOptions()
+    expect(getSupportedVoices).toHaveBeenCalledTimes(1)
   })
 })
 

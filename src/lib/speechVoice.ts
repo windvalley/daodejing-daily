@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import type { SpeechTimbre } from './store'
 
@@ -92,17 +93,47 @@ export function chineseVoiceOptions(options: VoiceOption[]): VoiceOption[] {
 
 let cachedVoices: VoiceEntry[] | null = null
 
-/** 读取系统音色列表，失败或环境不支持时返回空数组 */
+/**
+ * 浏览器里直接读 speechSynthesis。Capacitor 的 Web 实现会把首次非空结果存进闭包，
+ * 中文语音包后装好、voiceschanged 触发后它仍返回旧表，绕开插件才能读到新列表。
+ */
+function readBrowserVoices(): VoiceEntry[] | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+  return window.speechSynthesis.getVoices() as unknown as VoiceEntry[]
+}
+
+/**
+ * 读取系统音色列表，失败或环境不支持时返回空数组。
+ * 空结果不缓存：iOS 首次 getVoices() 常常是空的，要等 voiceschanged 之后才有值，
+ * 把空数组缓存下来会让设置页永远停在「正在读取系统音色…」。
+ * 读取失败同样不缓存，下次进设置页还能重试。
+ */
 export async function loadVoiceOptions(): Promise<VoiceOption[]> {
-  if (cachedVoices) return toVoiceOptions(cachedVoices)
+  if (cachedVoices?.length) return toVoiceOptions(cachedVoices)
+  const browserVoices = Capacitor.isNativePlatform() ? null : readBrowserVoices()
+  if (browserVoices) {
+    if (browserVoices.length) cachedVoices = browserVoices
+    return toVoiceOptions(browserVoices)
+  }
   try {
     const result = await TextToSpeech.getSupportedVoices()
-    cachedVoices = (result.voices ?? []) as VoiceEntry[]
-    return toVoiceOptions(cachedVoices)
+    const voices = (result.voices ?? []) as VoiceEntry[]
+    if (voices.length) cachedVoices = voices
+    return toVoiceOptions(voices)
   } catch {
-    cachedVoices = []
     return []
   }
+}
+
+/**
+ * 订阅浏览器音色列表的更新。
+ * 原生壳的音色随插件就绪，不触发该事件，返回空的清理函数即可。
+ */
+export function subscribeVoicesChanged(listener: () => void): () => void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return () => {}
+  const synthesis = window.speechSynthesis
+  synthesis.addEventListener('voiceschanged', listener)
+  return () => synthesis.removeEventListener('voiceschanged', listener)
 }
 
 /** 在音色列表里按 URI 找中文音色的索引；非中文与找不到都返回 undefined */
