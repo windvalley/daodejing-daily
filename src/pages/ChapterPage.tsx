@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { useToast } from '../components/toast-context'
@@ -9,8 +9,10 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { useNow } from '../hooks/useNow'
 import { useAppData } from '../hooks/useAppData'
 import { useSpeech } from '../hooks/useSpeech'
+import { useSwipePager } from '../hooks/useSwipePager'
 import { formatDateTime, formatDue, formatRelative } from '../lib/date'
 import { chapterSpeechText } from '../lib/speech'
+import type { SwipeDirection } from '../lib/swipe'
 import { applyToneSandhi } from '../lib/toneSandhi'
 import { actions } from '../lib/store'
 
@@ -185,6 +187,17 @@ function ChapterView({ chapter, headingRef }: { chapter: Chapter; headingRef: Re
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [navigate, previous, next])
+
+  const swipeTo = useCallback(
+    (direction: SwipeDirection) => {
+      const destination = direction === 'previous' ? previous : next
+      if (destination) navigate(`/chapters/${destination.number}`)
+    },
+    [navigate, previous, next],
+  )
+
+  // 左右滑翻章：手机上读完一段不用去找那行翻页链接
+  useSwipePager({ onSwipe: swipeTo })
 
   // 朗读文本走注音校正：多音字换成同音字再交给 TTS，避免引擎读错
   const speechText = useMemo(() => chapterSpeechText(chapter), [chapter])
