@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import type { SpeechTimbre } from './store'
 
@@ -93,6 +94,15 @@ export function chineseVoiceOptions(options: VoiceOption[]): VoiceOption[] {
 let cachedVoices: VoiceEntry[] | null = null
 
 /**
+ * 浏览器里直接读 speechSynthesis。Capacitor 的 Web 实现会把首次非空结果存进闭包，
+ * 中文语音包后装好、voiceschanged 触发后它仍返回旧表，绕开插件才能读到新列表。
+ */
+function readBrowserVoices(): VoiceEntry[] | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+  return window.speechSynthesis.getVoices() as unknown as VoiceEntry[]
+}
+
+/**
  * 读取系统音色列表，失败或环境不支持时返回空数组。
  * 空结果不缓存：iOS 首次 getVoices() 常常是空的，要等 voiceschanged 之后才有值，
  * 把空数组缓存下来会让设置页永远停在「正在读取系统音色…」。
@@ -100,6 +110,11 @@ let cachedVoices: VoiceEntry[] | null = null
  */
 export async function loadVoiceOptions(): Promise<VoiceOption[]> {
   if (cachedVoices?.length) return toVoiceOptions(cachedVoices)
+  const browserVoices = Capacitor.isNativePlatform() ? null : readBrowserVoices()
+  if (browserVoices) {
+    if (browserVoices.length) cachedVoices = browserVoices
+    return toVoiceOptions(browserVoices)
+  }
   try {
     const result = await TextToSpeech.getSupportedVoices()
     const voices = (result.voices ?? []) as VoiceEntry[]

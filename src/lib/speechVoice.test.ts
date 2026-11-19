@@ -154,6 +154,24 @@ describe('音色列表读取', () => {
     expect((await loadVoiceOptions()).map((item) => item.uri)).toContain('zh-CN-language')
   })
 
+  it('浏览器里直接读 speechSynthesis，绕开插件可能过期的缓存', async () => {
+    // Capacitor 的 Web 实现把首次非空列表存在闭包里，中文语音包后装好也不会更新
+    let voices: VoiceEntry[] = [{ voiceURI: 'en-us-x-iob-local', lang: 'en-US', localService: true }]
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: { getVoices: () => voices, addEventListener: () => {}, removeEventListener: () => {} },
+      configurable: true,
+    })
+    try {
+      expect(chineseVoiceOptions(await loadVoiceOptions())).toHaveLength(0)
+      voices = [...voices, { voiceURI: 'zh-Hans-language', lang: 'zh-Hans', localService: true }]
+      resetVoiceCache()
+      expect(chineseVoiceOptions(await loadVoiceOptions()).map((item) => item.uri)).toEqual(['zh-Hans-language'])
+      expect(getSupportedVoices).not.toHaveBeenCalled()
+    } finally {
+      delete (window as { speechSynthesis?: unknown }).speechSynthesis
+    }
+  })
+
   it('读到音色后走缓存，不重复调用插件', async () => {
     getSupportedVoices.mockResolvedValue({ voices: singleVoicePhone as unknown as SpeechSynthesisVoice[] })
     await loadVoiceOptions()

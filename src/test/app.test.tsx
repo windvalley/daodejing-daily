@@ -29,18 +29,27 @@ function renderApp(path = '/') {
   )
 }
 
-/** jsdom 没有 speechSynthesis，补一个空实现，让朗读相关文案按「支持朗读」渲染 */
+/**
+ * jsdom 没有 speechSynthesis，补一个空实现，让朗读相关文案按「支持朗读」渲染。
+ * 返回 emitVoicesChanged，用来模拟系统装好中文语音包后补发 voiceschanged。
+ */
 function stubSpeechSynthesis() {
+  const listeners = new Set<() => void>()
   Object.defineProperty(window, 'speechSynthesis', {
     value: {
       getVoices: () => [],
       cancel: () => {},
       speak: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === 'voiceschanged') listeners.add(listener)
+      },
+      removeEventListener: (type: string, listener: () => void) => {
+        if (type === 'voiceschanged') listeners.delete(listener)
+      },
     },
     configurable: true,
   })
+  return () => listeners.forEach((listener) => listener())
 }
 
 function restoreSpeechSynthesis() {
@@ -459,6 +468,24 @@ describe('设置页', () => {
       await screen.findByText(/这台设备只有这一个中文音色/)
       expect(screen.getByRole('group', { name: '选择朗读音色' })).toBeInTheDocument()
       expect(screen.queryByLabelText(/系统音色/)).not.toBeInTheDocument()
+    } finally {
+      restoreSpeechSynthesis()
+    }
+  })
+
+  it('系统补发 voiceschanged 后重新读取音色', async () => {
+    // iOS 上先只有外语，中文语音包后装好，不重读就一直显示没有中文音色
+    voiceMocks.voices = [{ voiceURI: 'en', name: 'English', lang: 'en', localService: true }]
+    const emitVoicesChanged = stubSpeechSynthesis()
+    try {
+      renderApp('/settings')
+      await screen.findByText(/没有读取到中文音色/)
+      voiceMocks.voices = [
+        { voiceURI: 'zh-Hans', name: 'Chinese China', lang: 'zh-Hans', localService: true },
+        { voiceURI: 'zh-CN', name: 'Chinese China', lang: 'zh-CN', localService: true },
+      ]
+      act(() => emitVoicesChanged())
+      expect(await screen.findByLabelText(/系统音色/)).toBeInTheDocument()
     } finally {
       restoreSpeechSynthesis()
     }
