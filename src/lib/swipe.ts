@@ -15,8 +15,6 @@ export interface SwipeGesture {
   durationMs: number
   /** 视口宽度，用来算左右边缘留给系统返回手势的范围 */
   viewportWidth: number
-  /** 起手时的触点数，双指缩放不参与翻章 */
-  touchCount: number
 }
 
 /**
@@ -39,8 +37,7 @@ export const SWIPE = {
  * 不满足条件时返回 null，调用方什么都不做。
  */
 export function swipeDirection(gesture: SwipeGesture): SwipeDirection | null {
-  const { startX, startY, endX, endY, durationMs, viewportWidth, touchCount } = gesture
-  if (touchCount !== 1) return null
+  const { startX, startY, endX, endY, durationMs, viewportWidth } = gesture
   if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > SWIPE.maxDurationMs) return null
   // 系统返回手势从屏幕边缘起手，这条不接管
   if (startX < SWIPE.edgeGuardPx || startX > viewportWidth - SWIPE.edgeGuardPx) return null

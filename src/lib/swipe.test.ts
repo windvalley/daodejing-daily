@@ -12,7 +12,6 @@ function gesture(overrides: Partial<SwipeGesture> = {}): SwipeGesture {
     endY: 505,
     durationMs: 180,
     viewportWidth: VIEWPORT,
-    touchCount: 1,
     ...overrides,
   }
 }
@@ -57,11 +56,6 @@ describe('左右滑翻章判定', () => {
   it('慢慢拖动不翻章，快速滑动才算', () => {
     expect(swipeDirection(gesture({ durationMs: 801 }))).toBeNull()
     expect(swipeDirection(gesture({ durationMs: 800 }))).toBe('next')
-  })
-
-  it('双指及以上不参与翻章，缩放留给浏览器', () => {
-    expect(swipeDirection(gesture({ touchCount: 2 }))).toBeNull()
-    expect(swipeDirection(gesture({ touchCount: 0 }))).toBeNull()
   })
 
   it('时长异常时放弃判定', () => {
