@@ -2256,6 +2256,7 @@ input[type='range'] {
   gap: 4px;
   /* 指头点得到：高度不小于 44 像素，左右各留一点内边距 */
   min-height: 44px;
+  min-width: 0;
   padding: 4px 10px;
   border-radius: 10px;
   color: var(--muted);
@@ -2267,13 +2268,29 @@ input[type='range'] {
     color 140ms ease;
 }
 
+/*
+ * 章题一旦变长（现存八十一章都是两字），两侧链接要能收缩并省略，
+ * 否则 nowrap 会把右侧箭头顶出视口。图标是 flex 子项，默认不收缩。
+ */
+.quicknav-link > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quicknav-link > svg {
+  flex: none;
+}
+
 .quicknav-link:hover {
   background: var(--surface-2);
   color: var(--accent-strong);
 }
 
+/* 禁用态与页底翻页卡一致：不接收指针事件，悬停时不会装成可点链接 */
 .quicknav-link.is-disabled {
   opacity: 0.55;
+  pointer-events: none;
 }
 
 .reading-aside {

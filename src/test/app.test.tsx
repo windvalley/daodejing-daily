@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -134,6 +134,49 @@ describe('章页', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '第9章 运夷' })).toHaveFocus()
     await user.keyboard('{ArrowLeft}')
     expect(await screen.findByRole('heading', { level: 1, name: '第8章 易性' })).toHaveFocus()
+  })
+
+  it('首次进入章页不抢焦点', () => {
+    renderApp('/chapters/8')
+    // 方向键翻章才把焦点交给标题；直接进入时焦点应留在文档上，否则读屏会跳过页头
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).not.toHaveFocus()
+  })
+
+  it('带修饰键的方向键不翻章', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    await user.keyboard('{Shift>}{ArrowRight}{/Shift}{Control>}{ArrowRight}{/Control}{Meta>}{ArrowRight}{/Meta}')
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('长按方向键产生的重复按键不再继续翻章', () => {
+    renderApp('/chapters/8')
+    // 系统对长按会按重复率连发 keydown，只认第一次
+    expect(fireEvent.keyDown(window, { key: 'ArrowRight', repeat: true })).toBe(true)
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('章中方向键拦下默认滚动并翻章', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    // fireEvent 返回 false 说明 preventDefault 生效，浏览器默认的横向滚动不会同时发生
+    expect(fireEvent.keyDown(window, { key: 'ArrowRight' })).toBe(false)
+    expect(await screen.findByRole('heading', { level: 1, name: '第9章 运夷' })).toBeInTheDocument()
+
+    await user.keyboard('{ArrowLeft}')
+    expect(await screen.findByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('首章按左方向键、末章按右方向键都停在原章，也不吃掉按键', () => {
+    const first = renderApp('/chapters/1')
+    // 边界键不 preventDefault，否则白白吞掉浏览器本来的滚动或光标移动
+    expect(fireEvent.keyDown(window, { key: 'ArrowLeft' })).toBe(true)
+    expect(screen.getByRole('heading', { level: 1, name: '第1章 体道' })).toBeInTheDocument()
+    first.unmount()
+
+    renderApp('/chapters/81')
+    expect(fireEvent.keyDown(window, { key: 'ArrowRight' })).toBe(true)
+    expect(screen.getByRole('heading', { level: 1, name: '第81章 显质' })).toBeInTheDocument()
   })
 
   it('在践行笔记里按方向键不会翻章', async () => {

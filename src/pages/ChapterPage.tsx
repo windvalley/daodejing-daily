@@ -159,13 +159,16 @@ function ChapterView({ chapter, headingRef }: { chapter: Chapter; headingRef: Re
   /*
    * 左右方向键翻章：桌面端读完一段不用回到页首或页底找链接。
    * 输入框、可编辑区与问道面板里不接管，带修饰键的组合留给浏览器与系统；
-   * 首尾章的边界键不 preventDefault，免得白白吃掉一次滚动。
+   * 首尾章的边界键不 preventDefault，免得白白吃掉一次滚动；
+   * 长按产生的重复按键也跳过，否则会一路跨掉十几章。
    * 面板开着时按 document 判断而不是按事件目标：入口没配置 AI 时输入框不出现，
    * 焦点会停在悬浮球上，事件目标落在面板外，只看目标会翻动背后被遮住的章节。
    */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      // 长按时系统会按重复率连发 keydown，不拦会一路跨掉十几章
+      if (event.repeat) return
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       const target = event.target
       if (
