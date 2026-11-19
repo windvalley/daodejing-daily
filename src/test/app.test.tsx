@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -77,7 +77,7 @@ describe('章页', () => {
   it('显示原文、译文与注释，并能标记已读', async () => {
     const user = userEvent.setup()
     const { container } = renderApp('/chapters/8')
-    expect(screen.getByRole('heading', { level: 1, name: '易性' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
     // 注音把原文拆成了逐字节点，按整段文本比对
     expect(container.querySelector('.original-text')?.textContent).toContain('上善若水。')
     expect(screen.getByText(/最高的善就像水/)).toBeInTheDocument()
@@ -100,6 +100,103 @@ describe('章页', () => {
   it('无效章号给出提示', () => {
     renderApp('/chapters/99')
     expect(screen.getByText(/没有找到第 99 章/)).toBeInTheDocument()
+  })
+
+  it('原文后就能翻到相邻章节，不必滚到页底', () => {
+    renderApp('/chapters/8')
+    const quicknav = screen.getByRole('navigation', { name: '原文后翻页' })
+    expect(within(quicknav).getByRole('link', { name: /上一章/ })).toHaveAttribute('href', '/chapters/7')
+    expect(within(quicknav).getByRole('link', { name: /下一章/ })).toHaveAttribute('href', '/chapters/9')
+    // DOM 顺序就是阅读顺序：入口要落在原文之后、章旨之前，页底翻页卡仍然保留
+    const gistHeading = screen.getByRole('heading', { level: 2, name: '章旨' })
+    expect(quicknav.compareDocumentPosition(gistHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: '章节导航' })).toBeInTheDocument()
+  })
+
+  it('首章的原文后翻页只给出下一章', () => {
+    renderApp('/chapters/1')
+    const quicknav = screen.getByRole('navigation', { name: '原文后翻页' })
+    expect(within(quicknav).getByText('已是开头')).toBeInTheDocument()
+    expect(within(quicknav).getByRole('link', { name: /下一章/ })).toHaveAttribute('href', '/chapters/2')
+  })
+
+  it('末章的原文后翻页只给出上一章', () => {
+    renderApp('/chapters/81')
+    const quicknav = screen.getByRole('navigation', { name: '原文后翻页' })
+    expect(within(quicknav).getByText('已是结尾')).toBeInTheDocument()
+    expect(within(quicknav).getByRole('link', { name: /上一章/ })).toHaveAttribute('href', '/chapters/80')
+  })
+
+  it('方向键翻到相邻章节，焦点落在新章标题上', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    await user.keyboard('{ArrowRight}')
+    expect(await screen.findByRole('heading', { level: 1, name: '第9章 运夷' })).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(await screen.findByRole('heading', { level: 1, name: '第8章 易性' })).toHaveFocus()
+  })
+
+  it('首次进入章页不抢焦点', () => {
+    renderApp('/chapters/8')
+    // 方向键翻章才把焦点交给标题；直接进入时焦点应留在文档上，否则读屏会跳过页头
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).not.toHaveFocus()
+  })
+
+  it('带修饰键的方向键不翻章', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    await user.keyboard('{Shift>}{ArrowRight}{/Shift}{Control>}{ArrowRight}{/Control}{Meta>}{ArrowRight}{/Meta}')
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('长按方向键产生的重复按键不再继续翻章', () => {
+    renderApp('/chapters/8')
+    // 系统对长按会按重复率连发 keydown，只认第一次
+    expect(fireEvent.keyDown(window, { key: 'ArrowRight', repeat: true })).toBe(true)
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('章中方向键拦下默认滚动并翻章', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    // fireEvent 返回 false 说明 preventDefault 生效，浏览器默认的横向滚动不会同时发生
+    expect(fireEvent.keyDown(window, { key: 'ArrowRight' })).toBe(false)
+    expect(await screen.findByRole('heading', { level: 1, name: '第9章 运夷' })).toBeInTheDocument()
+
+    await user.keyboard('{ArrowLeft}')
+    expect(await screen.findByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('首章按左方向键、末章按右方向键都停在原章，也不吃掉按键', () => {
+    const first = renderApp('/chapters/1')
+    // 边界键不 preventDefault，否则白白吞掉浏览器本来的滚动或光标移动
+    expect(fireEvent.keyDown(window, { key: 'ArrowLeft' })).toBe(true)
+    expect(screen.getByRole('heading', { level: 1, name: '第1章 体道' })).toBeInTheDocument()
+    first.unmount()
+
+    renderApp('/chapters/81')
+    expect(fireEvent.keyDown(window, { key: 'ArrowRight' })).toBe(true)
+    expect(screen.getByRole('heading', { level: 1, name: '第81章 显质' })).toBeInTheDocument()
+  })
+
+  it('在践行笔记里按方向键不会翻章', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    const textarea = screen.getByLabelText('我的践行笔记')
+    await user.click(textarea)
+    await user.keyboard('{ArrowRight}{ArrowLeft}')
+    expect(textarea).toHaveFocus()
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
+  })
+
+  it('问道面板开着时方向键不翻动背后的章节', async () => {
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    await user.click(screen.getByRole('button', { name: '打开问道' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-hidden', 'false')
+    // 未配置 AI 时面板里没有输入框，焦点会停在入口上，事件目标落在面板外
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('heading', { level: 1, name: '第8章 易性' })).toBeInTheDocument()
   })
 
   it('注音模式下标点跟在前一个字后面，不单独落到行首', () => {

@@ -2238,6 +2238,61 @@ input[type='range'] {
   font-weight: 600;
 }
 
+/*
+ * 原文后的就近翻页。
+ * 页底翻页卡要穿过章旨、译文、注释与践行笔记才够得到，读完原文就想换章的读者会多滑一屏；
+ * 这里只给方向与章号，视觉重量低于页底卡片，不抢它「学完这一章」的语义。
+ */
+.chapter-quicknav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quicknav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* 指头点得到：高度不小于 44 像素，左右各留一点内边距 */
+  min-height: 44px;
+  min-width: 0;
+  padding: 4px 10px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  white-space: nowrap;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+/*
+ * 章题一旦变长（现存八十一章都是两字），两侧链接要能收缩并省略，
+ * 否则 nowrap 会把右侧箭头顶出视口。图标是 flex 子项，默认不收缩。
+ */
+.quicknav-link > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quicknav-link > svg {
+  flex: none;
+}
+
+.quicknav-link:hover {
+  background: var(--surface-2);
+  color: var(--accent-strong);
+}
+
+/* 禁用态与页底翻页卡一致：不接收指针事件，悬停时不会装成可点链接 */
+.quicknav-link.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .reading-aside {
   display: flex;
   flex-direction: column;
@@ -4400,6 +4455,7 @@ input[type='range'] {
   .mobile-topbar,
   .bottom-nav,
   .chapter-actions,
+  .chapter-quicknav,
   .reading-aside,
   .toast-stack,
   .ai-launcher,

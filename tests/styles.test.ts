@@ -133,6 +133,17 @@ describe('章页注音排版', () => {
   })
 })
 
+describe('章页就近翻页', () => {
+  it('打印时隐藏原文后的翻页条', () => {
+    expect(mediaBody('print')).toMatch(/\.chapter-quicknav/)
+  })
+
+  it('首尾章的禁用态不接收指针事件，悬停时不会装成可点链接', () => {
+    // 与页底翻页卡的 .pager-link.is-disabled 同一套语义，漏掉会让人以为能点
+    expect(ruleBody('\\.quicknav-link\\.is-disabled')).toMatch(/pointer-events:\s*none/)
+  })
+})
+
 describe('问道入口只有一个', () => {
   it('旧的侧栏按钮与浮动按钮类名都已删除', () => {
     // 两个入口靠断点切换，改一处容易漏另一处；类名残留往往意味着规则还在
