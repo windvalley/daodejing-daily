@@ -124,6 +124,16 @@ describe('章页', () => {
     expect(getSnapshot().practice[8].text).toBe('今天绕开一次硬碰硬。')
   })
 
+  it('带 focus=practice 进入章页时把践行笔记滚进视野并聚焦', async () => {
+    // 从今日功课跳过来时要停在笔记上；jsdom 没有 scrollIntoView，setup.ts 补了空实现
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    renderApp('/chapters/8?focus=practice')
+    const textarea = screen.getByLabelText('我的践行笔记')
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    expect(textarea).toHaveFocus()
+    scrollIntoView.mockRestore()
+  })
+
   it('无效章号给出提示', () => {
     renderApp('/chapters/99')
     expect(screen.getByText(/没有找到第 99 章/)).toBeInTheDocument()
