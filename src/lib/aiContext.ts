@@ -219,7 +219,11 @@ export function buildAskMessages(
 
 /**
  * 空输入框没人会用，给几个能直接点的种子问题。
- * 全部来自本章已有的注释与概念，不调用模型，断网也能出。
+ * 全部来自本章已有的注释、概念与实践提示，不调用模型，断网也能出。
+ *
+ * 排列从读到做：先理解字词，再看这一章与概念的关系，最后落到怎么实践。
+ * 最后一条固定为「这一章该怎么实践？」，不引用具体章句：
+ * 每章的实践提示都随材料发过去，问题再抄一遍原文既占位又容易截成半句话。
  */
 export function seedQuestions(chapterNumber: number): string[] {
   const chapter = getChapter(chapterNumber)
@@ -227,7 +231,8 @@ export function seedQuestions(chapterNumber: number): string[] {
   const questions = chapter.notes.slice(0, 2).map((note) => `「${note.term}」该怎样理解？`)
   const concept = conceptsForChapter(chapterNumber)[0]
   questions.push(concept ? `这一章和「${concept.name}」是什么关系？` : `这一章的「${chapter.title}」，怎么落到今天？`)
-  return questions.slice(0, 3)
+  questions.push('这一章该怎么实践？')
+  return questions.slice(0, 4)
 }
 
 /**

@@ -155,6 +155,23 @@ describe('提问与回答', () => {
     expect(await within(dialog).findByText('第一个道是名词，第二个道是动词。')).toBeInTheDocument()
   })
 
+  it('最后一条种子问题落到实践，点一下带着本章位置发出去', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '今天可以先从一件小事做起。' })
+    const user = userEvent.setup()
+    renderApp('/chapters/7')
+    const dialog = await openPanel(user)
+
+    await user.click(within(dialog).getByRole('button', { name: '这一章该怎么实践？' }))
+
+    await waitFor(() => expect(aiMocks.requestChat).toHaveBeenCalledTimes(1))
+    const messages = aiMocks.requestChat.mock.calls[0][0] as { role: string; content: string }[]
+    expect(messages[messages.length - 1].content).toContain('【当前位置】第7章 韬光')
+    expect(messages[messages.length - 1].content).toContain('【提问】这一章该怎么实践？')
+    // 问题本身不抄章句，回答要靠材料里这一章的实践提示，缺失时只能泛泛而谈
+    expect(messages[0].content).toContain('实践提示：今天主动把一次便利让给别人')
+  })
+
   it('回答里点到的章号渲染成可点链接', async () => {
     saveAiConfig(config)
     aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '可以先看第8章，再对照第78章。' })
