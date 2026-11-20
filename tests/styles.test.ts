@@ -185,4 +185,32 @@ describe('问道入口只有一个', () => {
     expect(hidden).toMatch(/visibility:\s*hidden/)
     expect(hidden).toMatch(/pointer-events:\s*none/)
   })
+
+  it('底部收起的命中区不小于 44px，且不被 .button-small 盖掉', () => {
+    // .button-small 只有 34px；单手关闭靠的是这一颗，小了就又变成点不准的 X。
+    // 两条规则都是 min-height，靠书写顺序取胜时挪一下位置命中区就悄悄掉回 34px，
+    // 所以要求收起的规则用两个类提高权重，与先后顺序无关。
+    const body = ruleBody('\\.ai-collapse')
+    const minHeight = body.match(/min-height:\s*(\d+)px/)
+    expect(minHeight).not.toBeNull()
+    expect(Number(minHeight?.[1])).toBeGreaterThanOrEqual(44)
+    expect(css).toMatch(/\.button\.ai-collapse\s*\{/)
+  })
+
+  it('引导页的按钮栏贴底、与输入框那一行同一套内边距', () => {
+    // 删掉了 main 上的 .ai-empty .button { align-self: flex-start }，按钮改由这一栏承载：
+    // 少了它，column flex 的默认 stretch 会把两颗按钮拉成两行满宽。
+    const body = ruleBody('\\.ai-empty-foot')
+    expect(body).toMatch(/display:\s*flex/)
+    expect(body).toMatch(/align-items:\s*center/)
+    expect(body).toMatch(/gap:/)
+    const padding = body.match(/padding:\s*([^;]+);/)
+    const composerPadding = ruleBody('\\.ai-composer').match(/padding:\s*([^;]+);/)
+    expect(padding?.[1]).toBe(composerPadding?.[1])
+  })
+
+  it('输入框下方不再放隐私文案', () => {
+    // 按钮占的正是原来那行文案的位置，类名残留会让人以为文案还在
+    expect(css).not.toContain('.ai-privacy')
+  })
 })
