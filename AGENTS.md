@@ -89,6 +89,10 @@
 - 原生环境通过 `window.Capacitor.isNativePlatform()` 判断，相关封装在 `src/lib/nativeTheme.ts` 与 `src/hooks/useSpeech.ts`。
 - 安卓状态栏切换必须先调用 `SystemBars.setStyle`，再调用 `ThemeBackground.setBackground`。
 - 新增原生插件时必须在 `MainActivity.onCreate` 的 `super.onCreate` 之前注册。
+- 安卓返回键由 `@capacitor/app` 接管，落点判定在 `src/lib/androidBack.ts`，接线在 `src/hooks/useAndroidBack.ts`。
+  插件加载后它的 `OnBackPressedCallback` 一直是启用的：没有 backButton 监听者时只走 `webView.goBack()`、退不动就什么都不做，
+  有监听者时则把决定权完全交给前端。所以「退到第一页再退出」那一支必须显式调用 `App.exitApp()`，漏掉就是按返回没反应。
+  浏览器与 PWA 不接管，返回交给浏览器自己的历史。
 - `applicationId` 与签名密钥不能改，否则已安装用户无法覆盖升级。
 - 发版时同时修改 `package.json` 的 `version`、`android/app/build.gradle` 的 `versionName` 与递增的 `versionCode`，并更新 README 与 `docs/mobile.md` 中的 APK 文件名。
 
