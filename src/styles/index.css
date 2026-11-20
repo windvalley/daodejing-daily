@@ -4210,15 +4210,18 @@ input[type='range'] {
 }
 
 /*
- * 引导页的两个按钮排成一行，换行时整行靠左。
- * 行内用 align-items: center 对齐：收起的命中区比「去配置」高，靠顶会显得错位。
+ * 引导页的按钮栏，对应配置好后输入框那一行。
+ * 放在 .ai-body 之外：面板是 flex 列，这一栏固定贴底，
+ * 矮屏上正文再长也不会把「收起」挤进滚动区，读者不用先滚一下。
+ * 内边距与 .ai-composer 对齐，换到另一栏时不会跳。
  */
-.ai-empty-actions {
+.ai-empty-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  align-self: flex-start;
   gap: 10px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--line);
 }
 
 .ai-seeds {
@@ -4443,8 +4446,10 @@ input[type='range'] {
  * 底部收起。
  * 面板撑到 84vh 时右上角的关闭抬到屏幕上半部，单手够不到；
  * 命中区做到 44px（.button-small 只有 34px），落回拇指区，和发送按钮同一行。
+ * 选择器写成两个类：与 .button-small 同权重时靠书写顺序取胜太脆，
+ * 谁先谁后一改命中区就掉回 34px，而验收只能靠真机手感发现。
  */
-.ai-collapse {
+.button.ai-collapse {
   min-height: 44px;
   padding: 0 18px;
 }

@@ -112,8 +112,12 @@ describe('问道入口', () => {
     renderApp()
     const dialog = await openPanel(user)
 
-    // 引导页没有输入框，底部那条没有收起的落点，所以引导页自己也要有一个
-    await user.click(within(dialog).getByRole('button', { name: '收起' }))
+    // 引导页没有输入框那一行，收起挪到独立的按钮栏
+    const collapse = within(dialog).getByRole('button', { name: '收起问道' })
+    expect(collapse.closest('.ai-empty-foot')).not.toBeNull()
+    // 必须在滚动区之外：放进 .ai-body 里，矮屏上要先滚一下才够得到
+    expect(collapse.closest('.ai-body')).toBeNull()
+    await user.click(collapse)
     await waitFor(() => expect(dialog).toHaveAttribute('aria-hidden', 'true'))
   })
 
@@ -124,7 +128,11 @@ describe('问道入口', () => {
     const dialog = await openPanel(user)
 
     // 面板撑到 84vh 时右上角的关闭在屏幕上半部，底部这个才是单手够得到的
-    await user.click(within(dialog).getByRole('button', { name: '收起' }))
+    const collapse = within(dialog).getByRole('button', { name: '收起问道' })
+    // 位置就是这次改动的全部用意：必须钉在输入框那一行的左端，和发送按钮同一行
+    expect(collapse.closest('.ai-composer-foot')).not.toBeNull()
+    expect(collapse.closest('.ai-head')).toBeNull()
+    await user.click(collapse)
     await waitFor(() => expect(dialog).toHaveAttribute('aria-hidden', 'true'))
     expect(screen.getByRole('button', { name: '打开问道' })).toHaveFocus()
   })

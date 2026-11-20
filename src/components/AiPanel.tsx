@@ -221,10 +221,12 @@ function AssistantMessage({
  * 底部的收起按钮。
  * 面板撑到 84vh 时右上角的关闭抬到屏幕上半部，单手松松握着够不到；
  * 这里把关闭放回输入框同一行的左下角，拇指不用换手也不用往上探。
+ * 可访问名称补成「收起问道」：章页里「收起」已被译文与逐字解析占用，
+ * 读屏只听到「收起」会以为是折叠正文，而不是关掉对话框。
  */
 function CollapseButton({ onClose }: { onClose: () => void }) {
   return (
-    <button type="button" className="button button-small ai-collapse" onClick={onClose}>
+    <button type="button" className="button button-small ai-collapse" onClick={onClose} aria-label="收起问道">
       收起
     </button>
   )
@@ -274,22 +276,28 @@ function AiSession({
 
   if (!chat.configured) {
     return (
-      <div className="ai-body">
-        <div className="ai-empty">
-          <h3>还没有接入 AI</h3>
-          <p>
-            问道需要一个兼容 OpenAI 接口的模型服务，地址、模型名与密钥都填在「我的」里。
-            配置只存在这台设备上，不会跟随备份导出，也不会走任何中转服务。
-          </p>
-          <p className="ai-empty-note">不配置也没关系，阅读、背诵、复习与实践都不依赖它，断网时照样能用。</p>
-          <div className="ai-empty-actions">
-            <Link className="button button-primary button-small" to="/settings" onClick={onNavigate}>
-              去配置
-            </Link>
-            <CollapseButton onClose={onClose} />
+      <>
+        <div className="ai-body">
+          <div className="ai-empty">
+            <h3>还没有接入 AI</h3>
+            <p>
+              问道需要一个兼容 OpenAI 接口的模型服务，地址、模型名与密钥都填在「我的」里。
+              配置只存在这台设备上，不会跟随备份导出，也不会走任何中转服务。
+            </p>
+            <p className="ai-empty-note">不配置也没关系，阅读、背诵、复习与实践都不依赖它，断网时照样能用。</p>
           </div>
         </div>
-      </div>
+        {/*
+         * 引导页没有输入框那一行，把按钮放在滚动区之外单独占一栏：
+         * 放进 .ai-body 里的话，矮屏（如手机横屏）上要先在面板里滚一下才够得到。
+         */}
+        <div className="ai-empty-foot">
+          <Link className="button button-primary button-small" to="/settings" onClick={onNavigate}>
+            去配置
+          </Link>
+          <CollapseButton onClose={onClose} />
+        </div>
+      </>
     )
   }
 
