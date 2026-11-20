@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAndroidBack } from '../hooks/useAndroidBack'
 import { useAppData } from '../hooks/useAppData'
 import { useNow } from '../hooks/useNow'
 import { focusFromPath } from '../lib/aiContext'
@@ -57,6 +58,11 @@ export function Layout() {
     launcherRef.current?.focus({ preventScroll: true })
   }, [])
   const navigateFromAi = useCallback(() => setAiOpen(false), [])
+  // 回上一页交给浏览器历史，与 Capacitor 默认的 webView.goBack 走同一条路
+  const goBack = useCallback(() => window.history.back(), [])
+
+  // 安卓返回键：先收面板，再回上一页，最后才退出应用
+  useAndroidBack({ aiOpen, onCloseAi: closeAi, onGoBack: goBack })
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
