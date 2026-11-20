@@ -45,8 +45,12 @@ iPhone 上的边界：
 3. 已经退到会话的第一页才退出应用。
 
 由 `@capacitor/app` 的 `backButton` 事件接管，落点判定在 `src/lib/androidBack.ts`，接线在 `src/hooks/useAndroidBack.ts`。
-注册这个监听之后 Capacitor 不再自己回退或退出，所以第三层必须显式调用 `App.exitApp()`，漏掉就表现为「按返回没反应」。
+插件加载后，它注册的 `OnBackPressedCallback` 一直是启用的：没有 `backButton` 监听者时只会 `webView.goBack()`，退不动就什么都不做；
+有监听者时决定权完全交给前端，所以第三层必须显式调用 `App.exitApp()`，漏掉就表现为「按返回没反应」。
 监听只在 `isNativePlatform()` 为真时注册：浏览器与 PWA 的返回该由浏览器自己走历史，接管反而会吃掉正常的后退。
+
+首页按返回会 `finish()` 应用，正在播放的朗读随之停止。想要「离开界面继续听」得改用 `App.minimizeApp()`，
+那是刻意的取舍：返回键在首页的语义是「退出」。
 
 改动这部分后请重新执行 `pnpm apk`，并在真机上分别确认：面板开着按返回只收面板、章页按返回回到上一页、首页按返回退出应用。
 返回手势（从屏幕左右边缘向内滑）走的是同一条 `OnBackPressedDispatcher`，与返回键行为一致。

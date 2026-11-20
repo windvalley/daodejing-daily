@@ -53,7 +53,12 @@ export function useAndroidBack({
         if (disposed) void registered.remove()
         else handle = registered
       })
-      // 插件没装进旧安装包时不能让整页起一个未捕获的 rejection，返回键退回系统默认行为
+      /*
+       * 插件没装进旧安装包时不能让整页起一个未捕获的 rejection。
+       * 此时按返回的表现不是「系统默认的退出」：AppPlugin 的 OnBackPressedCallback
+       * 从插件加载起就是启用的，没有 backButton 监听者时它只会 webView.goBack()，
+       * 退不动就什么都不做。也就是说这一段失败会让返回键失灵，而不是回到旧行为。
+       */
       .catch(() => {})
 
     return () => {
