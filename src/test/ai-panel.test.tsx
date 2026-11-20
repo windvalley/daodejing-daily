@@ -107,6 +107,28 @@ describe('问道入口', () => {
     expect(aiMocks.requestChat).not.toHaveBeenCalled()
   })
 
+  it('未配置的引导页同样能一键收起', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    // 引导页没有输入框，底部那条没有收起的落点，所以引导页自己也要有一个
+    await user.click(within(dialog).getByRole('button', { name: '收起' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-hidden', 'true'))
+  })
+
+  it('底部「收起」关掉面板并把焦点还给入口', async () => {
+    saveAiConfig(config)
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    // 面板撑到 84vh 时右上角的关闭在屏幕上半部，底部这个才是单手够得到的
+    await user.click(within(dialog).getByRole('button', { name: '收起' }))
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-hidden', 'true'))
+    expect(screen.getByRole('button', { name: '打开问道' })).toHaveFocus()
+  })
+
   it('配置后打开，标题写明当前章节', async () => {
     saveAiConfig(config)
     const user = userEvent.setup()

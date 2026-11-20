@@ -129,7 +129,7 @@ export function AiPanel({
           </button>
         </header>
 
-        <AiSession key={focusKey(focus)} open={open} focus={focus} onNavigate={onNavigate} />
+        <AiSession key={focusKey(focus)} open={open} focus={focus} onNavigate={onNavigate} onClose={onClose} />
       </aside>
     </>
   )
@@ -218,11 +218,34 @@ function AssistantMessage({
 }
 
 /**
+ * 底部的收起按钮。
+ * 面板撑到 84vh 时右上角的关闭抬到屏幕上半部，单手松松握着够不到；
+ * 这里把关闭放回输入框同一行的左下角，拇指不用换手也不用往上探。
+ */
+function CollapseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button type="button" className="button button-small ai-collapse" onClick={onClose}>
+      收起
+    </button>
+  )
+}
+
+/**
  * 一次会话。
  * 用 focusKey 作为 key 挂在父组件上：翻章就整体重挂，历史与草稿一起清空。
  * 关掉面板不改变 key，所以会话在关开之间保留，方便中途回章页核对原文。
  */
-function AiSession({ open, focus, onNavigate }: { open: boolean; focus: AiFocus; onNavigate: () => void }) {
+function AiSession({
+  open,
+  focus,
+  onNavigate,
+  onClose,
+}: {
+  open: boolean
+  focus: AiFocus
+  onNavigate: () => void
+  onClose: () => void
+}) {
   const chat = useAiChat({ focus })
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -259,9 +282,12 @@ function AiSession({ open, focus, onNavigate }: { open: boolean; focus: AiFocus;
             配置只存在这台设备上，不会跟随备份导出，也不会走任何中转服务。
           </p>
           <p className="ai-empty-note">不配置也没关系，阅读、背诵、复习与实践都不依赖它，断网时照样能用。</p>
-          <Link className="button button-primary button-small" to="/settings" onClick={onNavigate}>
-            去配置
-          </Link>
+          <div className="ai-empty-actions">
+            <Link className="button button-primary button-small" to="/settings" onClick={onNavigate}>
+              去配置
+            </Link>
+            <CollapseButton onClose={onClose} />
+          </div>
         </div>
       </div>
     )
@@ -370,7 +396,7 @@ function AiSession({ open, focus, onNavigate }: { open: boolean; focus: AiFocus;
           placeholder="问这一章的意思、读音，或它和别章的关系…"
         />
         <div className="ai-composer-foot">
-          <p className="ai-privacy">只发送你在这里输入的内容，不会带上践行笔记。</p>
+          <CollapseButton onClose={onClose} />
           {chat.pending ? (
             <button type="button" className="button button-small" onClick={chat.cancel}>
               停止

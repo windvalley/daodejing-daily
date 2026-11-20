@@ -185,4 +185,18 @@ describe('问道入口只有一个', () => {
     expect(hidden).toMatch(/visibility:\s*hidden/)
     expect(hidden).toMatch(/pointer-events:\s*none/)
   })
+
+  it('底部收起的命中区不小于 44px，落在拇指够得到的输入框那一行', () => {
+    // .button-small 只有 34px；单手关闭靠的是这一颗，小了就又变成点不准的 X
+    const body = ruleBody('\\.ai-collapse')
+    const minHeight = body.match(/min-height:\s*(\d+)px/)
+    expect(minHeight).not.toBeNull()
+    expect(Number(minHeight?.[1])).toBeGreaterThanOrEqual(44)
+  })
+
+  it('输入框下方不再放隐私文案', () => {
+    // 按钮占的正是原来那行文案的位置，类名残留会让人以为文案还在
+    expect(css).not.toContain('.ai-privacy')
+    expect(ruleBody('\\.ai-composer-foot')).toMatch(/justify-content:\s*space-between/)
+  })
 })
