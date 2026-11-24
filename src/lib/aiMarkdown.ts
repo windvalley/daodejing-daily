@@ -10,6 +10,10 @@
  * - 块级：段落、ATX 标题、无序与有序列表（嵌套保留）、引用、围栏代码块、分隔线。
  * - 行内：`**粗体**`、`*斜体*`、反引号代码、反斜杠转义。
  *
+ * 单换行按硬换行保留（渲染成 `<br>`），只有空行才分段。
+ * 早先的纯文本版本靠 `white-space: pre-wrap` 保留换行，解析时若把单换行合并成一段，
+ * 模型用「1、2、3、」或 `•` 这类非 ASCII 编号写的要点会被并成一整行，比原样显示还难读。
+ *
  * 不做表格、图片、脚注与原始 HTML。链接不渲染成可点标签，统一写成「文字（地址）」：
  * 面板在 APK 里是 WebView，可点外链会把读者带离当前页，这里先保住来源信息。
  */
@@ -40,6 +44,14 @@ const QUOTE = /^ {0,3}>\s?(.*)$/
 const UL_ITEM = /^(\s*)[-*+]\s+(.*)$/
 const OL_ITEM = /^(\s*)(\d{1,9})[.)]\s+(.*)$/
 
+/**
+ * 嵌套解析的深度上限。
+ * 引用与列表都是递归解析的，`'>'.repeat(2000)` 这种输入会把调用栈打爆；
+ * 异常发生在 render 里，而全站没有 error boundary，抛出去就是整页白屏。
+ * 超过上限的内容按普通段落收下，宁可少排版也不让页面挂掉。
+ */
+const MAX_DEPTH = 8
+
 interface ListMarker {
   ordered: boolean
   /** 行首空格数，用来判断这一行是不是上一项的子内容 */
@@ -60,19 +72,6 @@ function matchListItem(line: string): ListMarker | null {
 /** 去掉标题末尾用于收口的 #，`## 标题 ##` 是合法写法 */
 function headingText(raw: string): string {
   return raw.replace(/\s+#+\s*$/, '').trim()
-}
-
-/**
- * 软换行合并。
- * 中文之间不加空格，英文单词之间加，否则折行的英文会粘成一个词。
- */
-function joinLines(lines: string[]): string {
-  return lines.reduce((text, line) => {
-    const piece = line.trim()
-    if (!text) return piece
-    if (/[A-Za-z0-9]$/.test(text) && /^[A-Za-z0-9]/.test(piece)) return `${text} ${piece}`
-    return text + piece
-  }, '')
 }
 
 function isBlank(line: string): boolean {
@@ -106,7 +105,23 @@ function startsBlock(line: string): boolean {
 /** 反斜杠转义：Markdown 里 `\*` 表示字面量星号 */
 const ESCAPABLE = new Set(['\\', '`', '*', '_', '[', ']', '(', ')', '#', '+', '-', '.', '!', '>', '~', '|'])
 
-function parseInline(text: string): InlineNode[] {
+/**
+ * 找强调的闭合标记。
+ *
+ * 闭合标记前一个字符不能是空白，否则「3 * 5 遍，坚持 2 * 7 天」会被读成一段斜体：
+ * 这里的星号是乘号，不是强调。CommonMark 的对侧空白规则同理。
+ */
+function findClose(text: string, from: number, marker: string): number {
+  let index = text.indexOf(marker, from)
+  while (index >= 0) {
+    const previous = text[index - 1]
+    if (previous !== undefined && !/\s/.test(previous)) return index
+    index = text.indexOf(marker, index + 1)
+  }
+  return -1
+}
+
+function parseInline(text: string, depth = 0): InlineNode[] {
   const nodes: InlineNode[] = []
   let buffer = ''
   let index = 0
@@ -147,25 +162,29 @@ function parseInline(text: string): InlineNode[] {
     if (char === '*') {
       // `***粗斜体***` 先按三层收口，否则会被拆成粗体加两个落单星号
       if (text.startsWith('***', index)) {
-        const triple = text.indexOf('***', index + 3)
-        if (triple > index + 3) {
+        const triple = findClose(text, index + 3, '***')
+        if (triple > index && !/\s/.test(text[index + 3] ?? ' ')) {
           flush()
           nodes.push({
             type: 'strong',
-            children: [{ type: 'em', children: parseInline(text.slice(index + 3, triple)) }],
+            children: [{ type: 'em', children: parseInline(text.slice(index + 3, triple), depth + 1) }],
           })
           index = triple + 3
           continue
         }
       }
       const marker = text[index + 1] === '*' ? '**' : '*'
-      const close = text.indexOf(marker, index + marker.length)
-      if (close > index + marker.length) {
-        flush()
-        const children = parseInline(text.slice(index + marker.length, close))
-        nodes.push({ type: marker === '**' ? 'strong' : 'em', children })
-        index = close + marker.length
-        continue
+      const next = text[index + marker.length]
+      // 开符后面紧跟空白就不是强调：「3 * 5」里的星号按字面量留下
+      if (next !== undefined && !/\s/.test(next)) {
+        const close = findClose(text, index + marker.length, marker)
+        if (close > index + marker.length) {
+          flush()
+          const children = parseInline(text.slice(index + marker.length, close), depth + 1)
+          nodes.push({ type: marker === '**' ? 'strong' : 'em', children })
+          index = close + marker.length
+          continue
+        }
       }
       // 未闭合按字面量显示：把后半段整体加粗会让读者看到中途突然变形
       buffer += marker
@@ -193,31 +212,48 @@ function parseInline(text: string): InlineNode[] {
 }
 
 /**
- * 一项列表。
- * 列表项自己的文字与缩进更深的子内容先一起收进 body，再交给 parseBlocks 递归：
- * 子列表、子引用、子代码块因此不需要各自单独写一套缩进规则。
+ * 行内标记剥成纯文字。
+ * 引用核查要拿模型引号里的原话去原文里比对，`「**上善若水**」` 里的星号是排版不是内容；
+ * 不剥掉会把这句真实存在的原文判成「未在书中找到」。
  */
-function buildItem(body: string[]): ListItem {
+export function stripInlineMarks(text: string): string {
+  return text
+    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+}
+
+/** 一项列表。项自己的文字与缩进更深的子内容先一起收进 body，再交给 parseBlocks 递归 */
+function buildItem(body: string[], depth: number): ListItem {
   const [first, ...rest] = body
-  const blocks = parseBlocks([first, ...dedent(rest)].join('\n'))
+  const blocks = parseBlocks([first, ...dedent(rest)].join('\n'), depth + 1)
   const [head, ...tail] = blocks
   // 项首永远是文字：`- **粗体**：说明` 这种写法解析出来是一段
   if (head && head.type === 'paragraph') return { content: head.content, children: tail }
   return { content: [], children: blocks }
 }
 
-/** 空行之后紧跟同级同类列表项时，这项仍属于同一个列表：模型常在要点之间空一行 */
-function continuesList(lines: string[], from: number, ordered: boolean, indent: number): boolean {
+/** 空行之后紧跟列表项时，这项仍属于同一个列表：模型常在要点之间空一行 */
+function resumesList(lines: string[], from: number, ordered: boolean, indent: number): number {
   let index = from
   while (index < lines.length && isBlank(lines[index])) index += 1
-  if (index >= lines.length) return false
-  const marker = matchListItem(lines[index])
-  if (!marker) return false
-  return marker.ordered === ordered && marker.indent === indent
+  const marker = index < lines.length ? matchListItem(lines[index]) : null
+  if (!marker) return -1
+  // 缩进更深的是当前项的子列表，换不换类型都算；同级则必须同类型
+  if (marker.indent > indent) return index
+  if (marker.indent === indent && marker.ordered === ordered) return index
+  return -1
 }
 
 /** 列表的结束条件是缩进回到当前层、换了列表类型，或者遇到顶格的普通段落与终止空行 */
-function parseList(lines: string[], startIndex: number, first: ListMarker): { block: BlockNode; next: number } {
+function parseList(
+  lines: string[],
+  startIndex: number,
+  first: ListMarker,
+  depth: number,
+): { block: BlockNode; next: number } {
   const { ordered, indent: rootIndent } = first
   const bodies: string[][] = []
   let start = first.start
@@ -226,8 +262,9 @@ function parseList(lines: string[], startIndex: number, first: ListMarker): { bl
   while (index < lines.length) {
     const line = lines[index]
     if (isBlank(line)) {
-      if (!continuesList(lines, index, ordered, rootIndent)) break
-      index += 1
+      const resumed = resumesList(lines, index, ordered, rootIndent)
+      if (resumed < 0) break
+      index = resumed
       continue
     }
     const marker = matchListItem(line)
@@ -250,10 +287,13 @@ function parseList(lines: string[], startIndex: number, first: ListMarker): { bl
     index += 1
   }
 
-  return { block: { type: 'list', ordered, start, items: bodies.map(buildItem) }, next: index }
+  return {
+    block: { type: 'list', ordered, start, items: bodies.map((body) => buildItem(body, depth)) },
+    next: index,
+  }
 }
 
-function parseBlocks(source: string): BlockNode[] {
+function parseBlocks(source: string, depth = 0): BlockNode[] {
   const lines = source.replace(/\r\n?/g, '\n').split('\n')
   const blocks: BlockNode[] = []
   let index = 0
@@ -264,6 +304,12 @@ function parseBlocks(source: string): BlockNode[] {
     if (isBlank(line)) {
       index += 1
       continue
+    }
+
+    // 超深嵌套不再递归：整段当文字收下，避免调用栈溢出
+    if (depth >= MAX_DEPTH) {
+      blocks.push({ type: 'paragraph', content: [{ type: 'text', text: lines.slice(index).join('\n') }] })
+      break
     }
 
     const fence = FENCE.exec(line)
@@ -307,13 +353,13 @@ function parseBlocks(source: string): BlockNode[] {
         quoted.push(match[1])
         index += 1
       }
-      blocks.push({ type: 'quote', blocks: parseBlocks(quoted.join('\n')) })
+      blocks.push({ type: 'quote', blocks: parseBlocks(quoted.join('\n'), depth + 1) })
       continue
     }
 
     const marker = matchListItem(line)
     if (marker) {
-      const parsed = parseList(lines, index, marker)
+      const parsed = parseList(lines, index, marker, depth)
       blocks.push(parsed.block)
       index = parsed.next
       continue
@@ -321,10 +367,10 @@ function parseBlocks(source: string): BlockNode[] {
 
     const paragraph: string[] = []
     while (index < lines.length && !isBlank(lines[index]) && (paragraph.length === 0 || !startsBlock(lines[index]))) {
-      paragraph.push(lines[index])
+      paragraph.push(lines[index].trimEnd())
       index += 1
     }
-    blocks.push({ type: 'paragraph', content: parseInline(joinLines(paragraph)) })
+    blocks.push({ type: 'paragraph', content: parseInline(paragraph.join('\n')) })
   }
 
   return blocks

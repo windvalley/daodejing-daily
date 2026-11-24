@@ -12,16 +12,35 @@ import { parseMarkdown, type BlockNode, type InlineNode, type ListItem } from '.
 const CARET = <span key="ai-caret" className="ai-caret" aria-hidden="true" />
 
 /**
+ * 文本节点里的换行渲染成 `<br>`。
+ * 解析层保留单换行、不做软换行合并，这里负责把它显示出来。
+ */
+function withBreaks(text: string, keyPrefix: string): ReactNode[] {
+  const parts = text.split('\n')
+  if (parts.length === 1) return [text]
+  const nodes: ReactNode[] = []
+  parts.forEach((part, index) => {
+    if (index > 0) nodes.push(<br key={`${keyPrefix}-br-${index}`} />)
+    if (part) nodes.push(part)
+  })
+  return nodes
+}
+
+/**
  * 行内节点。
  * caret 表示流式光标挂在这一段的末尾，必须是行内元素：
  * 另起一个块会和正文隔开一行，读起来像回答已经换段。
  */
-function inline(nodes: InlineNode[], caret = false): ReactNode[] {
+function inline(nodes: InlineNode[], caret = false, keyPrefix = 'i'): ReactNode[] {
   const rendered = nodes.map((node, index) => {
-    if (node.type === 'text') return node.text
-    if (node.type === 'code') return <code key={index}>{node.text}</code>
-    const children = inline(node.children)
-    return node.type === 'strong' ? <strong key={index}>{children}</strong> : <em key={index}>{children}</em>
+    if (node.type === 'text') return withBreaks(node.text, `${keyPrefix}-${index}`)
+    if (node.type === 'code') return <code key={`${keyPrefix}-${index}`}>{node.text}</code>
+    const children = inline(node.children, false, `${keyPrefix}-${index}`)
+    return node.type === 'strong' ? (
+      <strong key={`${keyPrefix}-${index}`}>{children}</strong>
+    ) : (
+      <em key={`${keyPrefix}-${index}`}>{children}</em>
+    )
   })
   if (caret) rendered.push(CARET)
   return rendered
@@ -33,42 +52,50 @@ function headingTag(level: number): 'h3' | 'h4' | 'h5' | 'h6' {
   return `h${mapped}` as 'h3' | 'h4' | 'h5' | 'h6'
 }
 
-function listItems(items: ListItem[], ordered: boolean, caret = false): ReactNode[] {
-  const NestedList = ordered ? 'ol' : 'ul'
+/**
+ * 列表项。
+ * 子块直接渲染在 `<li>` 里，不再套一层 `<ul>/<ol>`：
+ * 子块自身可能是列表、段落或引用，包一层列表会得到 `ul > ul`、`ul > p` 这种非法结构，
+ * 读屏会把外层当成空列表，缩进也会每层多出一段。`li` 本来就允许流式内容。
+ */
+function listItems(items: ListItem[], caret: boolean, keyPrefix: string): ReactNode[] {
   return items.map((item, index) => {
     const last = caret && index === items.length - 1
+    const children = item.children
     return (
-      <li key={index}>
-        {inline(item.content, last && !item.children.length)}
-        {item.children.length ? (
-          <NestedList>{item.children.map((child, childIndex) => block(child, childIndex, last))}</NestedList>
-        ) : null}
+      <li key={`${keyPrefix}-${index}`}>
+        {inline(item.content, last && children.length === 0, `${keyPrefix}-${index}`)}
+        {children.map((child, childIndex) =>
+          block(child, `${keyPrefix}-${index}-${childIndex}`, last && childIndex === children.length - 1),
+        )}
       </li>
     )
   })
 }
 
 /** caret 只在最后一块里出现一次，所以整棵树只有最末一条路径带它 */
-function block(node: BlockNode, key: number, caret = false): ReactNode {
+function block(node: BlockNode, key: string, caret = false): ReactNode {
   switch (node.type) {
     case 'paragraph':
-      return <p key={key}>{inline(node.content, caret)}</p>
+      return <p key={key}>{inline(node.content, caret, key)}</p>
     case 'heading': {
       const Tag = headingTag(node.level)
-      return <Tag key={key}>{inline(node.content, caret)}</Tag>
+      return <Tag key={key}>{inline(node.content, caret, key)}</Tag>
     }
     case 'list':
       return node.ordered ? (
         <ol key={key} start={node.start > 1 ? node.start : undefined}>
-          {listItems(node.items, true, caret)}
+          {listItems(node.items, caret, key)}
         </ol>
       ) : (
-        <ul key={key}>{listItems(node.items, false, caret)}</ul>
+        <ul key={key}>{listItems(node.items, caret, key)}</ul>
       )
     case 'quote':
       return (
         <blockquote key={key}>
-          {node.blocks.map((child, index) => block(child, index, caret && index === node.blocks.length - 1))}
+          {node.blocks.map((child, index) =>
+            block(child, `${key}-${index}`, caret && index === node.blocks.length - 1),
+          )}
         </blockquote>
       )
     case 'code':
@@ -92,9 +119,12 @@ function block(node: BlockNode, key: number, caret = false): ReactNode {
 
 export function AiMarkdown({ content, streaming = false }: { content: string; streaming?: boolean }) {
   const blocks = useMemo(() => parseMarkdown(content), [content])
+  // 只有一个换行或只有 `>` 时解析不出块，光标不能跟着消失
+  const fallbackCaret = streaming && blocks.length === 0
   return (
     <div className="ai-markdown">
-      {blocks.map((node, index) => block(node, index, streaming && index === blocks.length - 1))}
+      {fallbackCaret ? CARET : null}
+      {blocks.map((node, index) => block(node, `b${index}`, streaming && index === blocks.length - 1))}
     </div>
   )
 }
