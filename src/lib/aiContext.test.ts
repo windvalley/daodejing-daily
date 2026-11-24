@@ -56,6 +56,14 @@ describe('system 提示词', () => {
     expect(AI_RULES).toContain('训释分歧照实说')
     expect(AI_RULES).toContain('不要编造章句')
   })
+
+  it('排版规则放开粗体与短列表，仍然挡掉表格与代码块', () => {
+    // 回答已经能渲染简单 Markdown，提示词就没必要再要求纯文本；
+    // 但表格和代码块在 430px 的面板里读不了，继续在提示词里挡掉
+    expect(AI_RULES).toContain('粗体')
+    expect(AI_RULES).toContain('短列表')
+    expect(AI_RULES).toContain('不要表格与代码块')
+  })
 })
 
 describe('焦点块', () => {

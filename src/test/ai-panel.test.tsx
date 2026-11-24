@@ -622,3 +622,165 @@ describe('停止生成', () => {
     expect(await within(dialog).findByRole('button', { name: '发送' })).toBeInTheDocument()
   })
 })
+
+describe('回答排版', () => {
+  it('标题、粗体与列表按排版渲染，符号不再露给读者', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '### 支持背诵的理由\n\n* **强化摄心与专注**：背诵要求心无杂念。\n* **深入理解经文**：背过之后理解更深。',
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '是否建议全文背诵')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByRole('heading', { name: '支持背诵的理由' })).toBeInTheDocument()
+    const items = within(dialog).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(within(items[0]).getByText('强化摄心与专注').tagName).toBe('STRONG')
+
+    // 提问的气泡也在 .ai-bubble 里，断言必须限定在助手那一条
+    const text = dialog.querySelector('.ai-message.is-assistant .ai-bubble')?.textContent ?? ''
+    expect(text).not.toContain('###')
+    expect(text).not.toContain('**')
+  })
+
+  it('回答里的 HTML 只当文字显示，不会生成元素', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '第一行 <img src=x onerror=alert(1)> 结束，重点看 **这一句**。',
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '问一句')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText(/第一行/)
+    const bubble = dialog.querySelector('.ai-message.is-assistant .ai-bubble')
+    expect(bubble?.querySelector('img')).toBeNull()
+    expect(bubble?.textContent).toContain('<img src=x onerror=alert(1)>')
+    // 顺手证明这条走的是 Markdown 渲染路径：旧实现把整段当纯文本，不会有 strong
+    expect(bubble?.querySelector('strong')?.textContent).toBe('这一句')
+  })
+
+  it('嵌套列表渲染成 li 里的子列表，不出现 ul 套 ul', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '1. 先通读。\n   - 每天一章\n   - 每章读三遍\n2. 再复述。',
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '怎么读')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText('先通读。')
+    const bubble = dialog.querySelector('.ai-message.is-assistant .ai-bubble')
+    // 子列表必须是 li 的直接子元素；多包一层会得到 ul>ul / ol>ul 这种非法结构
+    expect(bubble?.querySelector('ul > ul, ol > ul, ul > ol, ol > ol')).toBeNull()
+    const nested = bubble?.querySelector('ol > li > ul')
+    expect(nested).not.toBeNull()
+    expect(nested?.parentElement?.tagName).toBe('LI')
+  })
+
+  it('中文习惯编号与项目符号保留原分行，不被并成一整段', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '可以分三步：\n1、先通读原文\n2、再看注释\n3、最后背诵',
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '怎么读')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText(/先通读原文/)
+    const bubble = dialog.querySelector('.ai-message.is-assistant .ai-bubble')
+    // 早先这三行会被并成「可以分三步：1、先通读原文2、再看注释3、最后背诵」
+    expect(bubble?.querySelectorAll('br')).toHaveLength(3)
+  })
+
+  it('流式生成中途未闭合的粗体按字面量显示，闭合后才变成粗体', async () => {
+    saveAiConfig(config)
+    let emit: ((text: string) => void) | undefined
+    aiMocks.requestChat.mockImplementation((_messages, _config, options) => {
+      emit = options?.onDelta
+      return new Promise((resolve) => {
+        setTimeout(() => emit?.('答案里有 **还没'), 0)
+        setTimeout(() => emit?.('闭合的粗体**'), 20)
+        setTimeout(() => resolve({ status: 'ok', content: '答案里有 **还没闭合的粗体**' }), 60)
+      })
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '问一句')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    // 半截时星号是字面量，不会把后半段整体加粗
+    await within(dialog).findByText(/答案里有/)
+    const bubble = dialog.querySelector('.ai-message.is-assistant .ai-bubble')
+    expect(bubble?.textContent).toContain('**还没')
+    // 闭合标记到了之后才变成粗体，并且标记本身不再显示
+    await waitFor(() => expect(bubble?.querySelector('strong')?.textContent).toBe('还没闭合的粗体'))
+    expect(bubble?.textContent).not.toContain('**')
+  })
+
+  it('流式生成时气泡里始终只有一个光标', async () => {
+    saveAiConfig(config)
+    let emit: ((text: string) => void) | undefined
+    aiMocks.requestChat.mockImplementation((_messages, _config, options) => {
+      emit = options?.onDelta
+      return new Promise((resolve) => {
+        // 列表项带子块：早先会同时挂上两个光标
+        setTimeout(() => emit?.('1. 先通读全书\n   - 每天一章\n   - 每章读三遍\n   这样'), 0)
+        setTimeout(
+          () =>
+            resolve({ status: 'ok', content: '1. 先通读全书\n   - 每天一章\n   - 每章读三遍\n   这样一轮就下来了。' }),
+          80,
+        )
+      })
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '怎么读')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await waitFor(() => expect(dialog.querySelectorAll('.ai-caret')).toHaveLength(1))
+    await waitFor(() => expect(dialog.querySelector('.ai-caret')).toBeNull())
+  })
+})
+
+describe('排版与引用核查的交互', () => {
+  it('引号里的粗体标记不算内容，真实原文不会被判成编造', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '第8章说「**上善若水，水善利万物而不争**」。',
+    })
+    const user = userEvent.setup()
+    renderApp('/chapters/8')
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '这一句怎么理解？')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText(/上善若水/)
+    // 星号是排版不是内容：带进核查会把真实原文判成找不到，提示里也会把 ** 露出来
+    expect(within(dialog).queryByText(/未在书中找到/)).toBeNull()
+    expect(within(dialog).getByRole('link', { name: '第8章' })).toHaveAttribute('href', '/chapters/8')
+  })
+})

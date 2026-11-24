@@ -214,3 +214,39 @@ describe('问道入口只有一个', () => {
     expect(css).not.toContain('.ai-privacy')
   })
 })
+
+describe('回答排版', () => {
+  it('列表符号显式加回来，且写在全局 reset 之后', () => {
+    // 真实渲染时发现：不写这两条，回答里的要点清单会变成没有符号的缩进块。
+    // 只看「规则存在」不够：把 reset 挪到后面、或再加一条 `.ai-markdown ul { list-style: none }`，
+    // 断言照样绿，浏览器里符号却没了。所以按出现位置判断层叠顺序。
+    const resetAt = css.indexOf('list-style: none;')
+    const discAt = css.indexOf('list-style: disc;')
+    const decimalAt = css.indexOf('list-style: decimal;')
+    expect(resetAt).toBeGreaterThanOrEqual(0)
+    expect(discAt).toBeGreaterThan(resetAt)
+    expect(decimalAt).toBeGreaterThan(resetAt)
+
+    // .ai-markdown 作用域内不许再出现把符号关掉的声明
+    const scoped = [...css.matchAll(/\.ai-markdown [^{]*{([^}]*)}/g)]
+      .map((match) => match[1].match(/list-style:\s*(\w+)/)?.[1])
+      .filter(Boolean)
+    expect(scoped).not.toContain('none')
+  })
+
+  it('回答层改回 normal 换行，气泡的 pre-wrap 不会再制造硬折行', () => {
+    // .ai-bubble 的 pre-wrap 是给读者提问留的；回答里的换行由解析层的 <br> 承载。
+    // 这一层不覆盖回去，块级元素之间的源码换行会各多出一行空白。
+    expect(ruleBody('\\.ai-bubble')).toMatch(/white-space:\s*pre-wrap/)
+    expect(ruleBody('\\.ai-markdown')).toMatch(/white-space:\s*normal/)
+    // 作用域内只允许 normal，再加回 pre-wrap 会让块之间的换行变成空行
+    const scoped = [...css.matchAll(/\.ai-markdown[^{]*{[^}]*white-space:\s*([\w-]+)/g)].map((match) => match[1])
+    expect(scoped).not.toContain('pre-wrap')
+  })
+
+  it('子列表挂在 li 里，缩进不会每层多叠一段', () => {
+    // 渲染层若多包一层 ul，得到的是 ul > ul：缩进变成 padding 20 + 18 + 20，
+    // jsdom 里看不出来，只能靠这条约定兜住「只有 li 的直接子列表才有 18px」
+    expect(ruleBody('\\.ai-markdown li > ul,\\s*\\n\\.ai-markdown li > ol')).toMatch(/padding-left:\s*18px/)
+  })
+})

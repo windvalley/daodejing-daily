@@ -7,6 +7,7 @@
  */
 
 import { chapters, getChapter } from '../data/chapters'
+import { stripInlineMarks } from './aiMarkdown'
 import { normalize } from './memorize'
 
 export interface CitationQuote {
@@ -95,7 +96,9 @@ export function extractQuoteSpans(answer: string): RawQuote[] {
     pattern.lastIndex = 0
     let match = pattern.exec(answer)
     while (match) {
-      const quote = match[1].trim()
+      // 引号里可能带 `**` 这类排版标记：撕掉再比对，否则真实存在的原文会被判成编造，
+      // 提示文案里也会把星号直接露给读者
+      const quote = stripInlineMarks(match[1]).trim()
       if (quote && !found.some((item) => item.text === quote)) {
         found.push({ text: quote, index: match.index, end: match.index + match[0].length })
       }
