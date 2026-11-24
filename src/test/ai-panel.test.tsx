@@ -622,3 +622,64 @@ describe('停止生成', () => {
     expect(await within(dialog).findByRole('button', { name: '发送' })).toBeInTheDocument()
   })
 })
+
+describe('回答排版', () => {
+  it('标题、粗体与列表按排版渲染，符号不再露给读者', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '### 支持背诵的理由\n\n* **强化摄心与专注**：背诵要求心无杂念。\n* **深入理解经文**：背过之后理解更深。',
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '是否建议全文背诵')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByRole('heading', { name: '支持背诵的理由' })).toBeInTheDocument()
+    const items = within(dialog).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(within(items[0]).getByText('强化摄心与专注').tagName).toBe('STRONG')
+
+    // 提问的气泡也在 .ai-bubble 里，断言必须限定在助手那一条
+    const text = dialog.querySelector('.ai-message.is-assistant .ai-bubble')?.textContent ?? ''
+    expect(text).not.toContain('###')
+    expect(text).not.toContain('**')
+  })
+
+  it('回答里的 HTML 只当文字显示，不会生成元素', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({
+      status: 'ok',
+      content: '第一行 <img src=x onerror=alert(1)> 结束',
+    })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '问一句')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    await within(dialog).findByText(/第一行/)
+    expect(dialog.querySelector('.ai-message.is-assistant .ai-bubble img')).toBeNull()
+    expect(dialog.querySelector('.ai-message.is-assistant .ai-bubble')?.textContent).toContain(
+      '<img src=x onerror=alert(1)>',
+    )
+  })
+
+  it('流式生成中途未闭合的粗体按字面量显示，不会吞掉后半段', async () => {
+    saveAiConfig(config)
+    aiMocks.requestChat.mockResolvedValue({ status: 'ok', content: '答案里有 **还没闭合的粗体' })
+    const user = userEvent.setup()
+    renderApp()
+    const dialog = await openPanel(user)
+
+    await user.type(within(dialog).getByRole('textbox', { name: '你的问题' }), '问一句')
+    await user.click(within(dialog).getByRole('button', { name: '发送' }))
+
+    expect(await within(dialog).findByText(/还没闭合的粗体/)).toBeInTheDocument()
+    expect(dialog.querySelector('.ai-message.is-assistant .ai-bubble strong')).toBeNull()
+    expect(dialog.querySelector('.ai-message.is-assistant .ai-bubble')?.textContent).toContain('**还没闭合的粗体')
+  })
+})

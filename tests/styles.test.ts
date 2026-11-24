@@ -214,3 +214,24 @@ describe('问道入口只有一个', () => {
     expect(css).not.toContain('.ai-privacy')
   })
 })
+
+describe('回答排版', () => {
+  it('列表符号显式加回来，全站 reset 把 list-style 清空了', () => {
+    // 真实渲染时发现：不写这两条，回答里的要点清单会变成没有符号的缩进块，
+    // 只在 jsdom 里断言解析结果看不出来，所以在样式源上补一道。
+    // 不能用 ruleBody：它按选择器子串匹配，会先命中 `.ai-markdown ul, .ai-markdown ol` 这条合并规则，
+    // 拿到的是没有 list-style 的那份声明。
+    const listStyle = [...css.matchAll(/\.ai-markdown (?:ul|ol)[^{]*{([^}]*)}/g)]
+      .map((match) => match[1].match(/list-style:\s*(\w+)/)?.[1])
+      .filter(Boolean)
+    expect(listStyle).toContain('disc')
+    expect(listStyle).toContain('decimal')
+  })
+
+  it('回答层改回 normal 换行，气泡的 pre-wrap 不会再制造硬折行', () => {
+    // .ai-bubble 的 pre-wrap 是给读者提问留的；解析时已经合并掉软换行，
+    // 这一层不覆盖回去，气泡里会出现解析后的额外断行
+    expect(ruleBody('\\.ai-bubble')).toMatch(/white-space:\s*pre-wrap/)
+    expect(ruleBody('\\.ai-markdown')).toMatch(/white-space:\s*normal/)
+  })
+})

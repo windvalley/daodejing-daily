@@ -6,6 +6,7 @@ import { useAiChat } from '../hooks/useAiChat'
 import type { AiErrorKind } from '../lib/ai'
 import { fallbackChapters, seedQuestions, type AiFocus } from '../lib/aiContext'
 import { citationNotice, type CitationReport } from '../lib/aiCitations'
+import { AiMarkdown } from './AiMarkdown'
 import { Icon } from './Icon'
 
 /** 重试有机会成功的错误。鉴权与额度重试也是同一个结果，只给指路 */
@@ -197,10 +198,10 @@ function AssistantMessage({
   }
   return (
     <div className="ai-message is-assistant">
-      <p className={streaming ? 'ai-bubble is-streaming' : 'ai-bubble'}>
-        {content}
-        {streaming ? <span className="ai-caret" aria-hidden="true" /> : null}
-      </p>
+      {/* 气泡里不能再用 p：回答会渲染出段落、列表与标题，块级元素套在 p 里会被浏览器拆开 */}
+      <div className={streaming ? 'ai-bubble is-streaming' : 'ai-bubble'}>
+        <AiMarkdown content={content} streaming={streaming} />
+      </div>
       {partial ? <p className="ai-notice">已停止生成，上面是未写完的部分。</p> : null}
       {report && report.chapters.length ? (
         <div className="ai-cites">
