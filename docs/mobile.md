@@ -4,7 +4,7 @@
 
 ## 一、安卓 APK
 
-构建产物位于 `android/app/build/outputs/apk/release/app-release.apk`，已导出为 `release/道德经日课-1.4.5.apk`，直接用数据线或聊天软件传到手机，点击安装即可。
+构建产物位于 `android/app/build/outputs/apk/release/app-release.apk`，已导出为 `release/道德经日课-1.4.6.apk`，直接用数据线或聊天软件传到手机，点击安装即可。
 
 首次安装需要在系统里允许「安装未知来源应用」。这个 APK 用自签名证书签名，不是从应用商店下载，所以系统会提示风险，属于正常现象。
 
