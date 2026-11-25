@@ -124,6 +124,18 @@ describe('注音与逐字解析', () => {
     })
   })
 
+  it('第十四章「绳绳」只把 mǐn 当作又读，正文注音仍是 shéng', () => {
+    // 《广韵》「绳」只有食陵切，「又民忍反」是《经典释文》的又音，帛书本此处作「寻寻」。
+    // 正文标 mǐn 会让读音与通行读法分家，这里锁住「又读只写在提示里」的处理。
+    const gloss = getChapterGloss(14)!
+    const tokens = gloss.flat().filter((token) => token.char === '绳')
+    expect(tokens).toHaveLength(2)
+    tokens.forEach((token) => expect(token.pinyin).toBe('shéng'))
+    expect(tokens[0].hint).toBe('又读 mǐn')
+    expect(tokens[1].hint).toBeUndefined()
+    expect(getChapter(14)!.notes.find((note) => note.term === '绳绳')?.text).toContain('mǐn')
+  })
+
   it('每句都以带拼音的汉字开头，句首不会出现标点', () => {
     // 章页把标点并入它前面的字再禁止换行，行首标点没有前字可挂靠，会退回可断行的旧行为
     chapters.forEach((chapter) => {

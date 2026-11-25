@@ -1068,8 +1068,8 @@ export const glosses1to20: Record<number, ChapterGloss> = {
       { char: '。' },
     ],
     [
-      { char: '绳', pinyin: 'shéng', gloss: '形容词。叠用为“绳绳”，连绵不绝的样子。' },
-      { char: '绳', pinyin: 'shéng', gloss: '形容词。叠用为“绳绳”，连绵不绝的样子。' },
+      { char: '绳', pinyin: 'shéng', gloss: '形容词。连绵不绝的样子。', hint: '又读 mǐn' },
+      { char: '绳', pinyin: 'shéng', gloss: '形容词。叠用，与上字同义。' },
       { char: '不', pinyin: 'bù', gloss: '副词。不，表否定。' },
       { char: '可', pinyin: 'kě', gloss: '助动词。可以、能够。' },
       { char: '名', pinyin: 'míng', gloss: '动词。命名、称作。' },
